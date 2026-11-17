@@ -39,14 +39,18 @@ function db(): PDO {
     return $pdo;
 }
 
+// Every statement in schema.sql is "CREATE TABLE IF NOT EXISTS", so it is safe to re-run.
+// It runs again whenever schema.sql changes (new tables in a later stage).
 function ensure_schema(PDO $pdo): void {
-    try {
-        $pdo->query('SELECT 1 FROM users LIMIT 1');
-        return;
-    } catch (PDOException $e) {
-        // tables missing: create them below
-    }
     $sql = file_get_contents(__DIR__ . '/schema.sql');
+    $hash = md5($sql);
+    try {
+        $st = $pdo->prepare('SELECT v FROM settings WHERE k = ?');
+        $st->execute(['schema_hash']);
+        if ($st->fetchColumn() === $hash) return;
+    } catch (PDOException $e) {
+        // settings table not there yet
+    }
     if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {   // local testing only
         $sql = str_replace(['AUTO_INCREMENT', ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'], ['AUTOINCREMENT', ''], $sql);
     }
@@ -55,6 +59,8 @@ function ensure_schema(PDO $pdo): void {
         $stmt = trim(implode("\n", $lines));
         if ($stmt !== '') $pdo->exec($stmt);
     }
+    $pdo->prepare('DELETE FROM settings WHERE k = ?')->execute(['schema_hash']);
+    $pdo->prepare('INSERT INTO settings (k, v) VALUES (?, ?)')->execute(['schema_hash', $hash]);
 }
 
 function now(): string { return gmdate('Y-m-d H:i:s'); }
@@ -130,6 +136,78 @@ function too_many_attempts(string $email): bool {
     $st = db()->prepare('SELECT COUNT(*) FROM login_attempts WHERE success = 0 AND created_at > ? AND (email = ? OR ip = ?)');
     $st->execute([$since, $email, client_ip()]);
     return (int)$st->fetchColumn() >= 8;
+}
+
+// ---------------------------------------------------------------- techs
+const SKILLS = [
+    'pc'        => 'Desktop and laptop repair',
+    'network'   => 'Network switches and routers',
+    'wifi'      => 'Wi-Fi and access points',
+    'cabling'   => 'Structured cabling',
+    'fiber'     => 'Fiber optics',
+    'printers'  => 'Printers and copiers',
+    'pos'       => 'POS and retail systems',
+    'servers'   => 'Servers and racks',
+    'smarthands'=> 'Data center smart hands',
+    'voip'      => 'VoIP and phone systems',
+    'cctv'      => 'Security cameras and access control',
+    'av'        => 'Audio-visual',
+    'rollouts'  => 'Retail and branch rollouts',
+    'windows'   => 'Windows and Microsoft 365',
+    'mac'       => 'Mac and Apple devices',
+    'linux'     => 'Linux',
+];
+
+const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+    'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX',
+    'UT','VT','VA','WA','WV','WI','WY'];
+
+function upload_dir(): string {
+    $d = __DIR__ . '/uploads';
+    if (!is_dir($d)) mkdir($d, 0750, true);
+    return $d;
+}
+
+function tech_profile(int $userId): ?array {
+    $st = db()->prepare('SELECT * FROM tech_profiles WHERE user_id = ?');
+    $st->execute([$userId]);
+    return $st->fetch() ?: null;
+}
+
+// The most recent insurance document, plus whether the tech is currently insured.
+function insurance_state(int $userId): array {
+    $st = db()->prepare('SELECT * FROM insurance_docs WHERE user_id = ? ORDER BY id DESC LIMIT 1');
+    $st->execute([$userId]);
+    $doc = $st->fetch() ?: null;
+    $today = gmdate('Y-m-d');
+    $insured = $doc && $doc['status'] === 'approved' && $doc['expires_on'] >= $today;
+    $expSoon = $insured && $doc['expires_on'] <= gmdate('Y-m-d', time() + 30 * 86400);
+    return ['doc' => $doc, 'insured' => $insured, 'expiring_soon' => $expSoon,
+            'expired' => $doc && $doc['status'] === 'approved' && $doc['expires_on'] < $today];
+}
+
+// US Census geocoder: free, no key. Returns [lat, lng] or null.
+function geocode_us(string $street, string $city, string $state, string $zip): ?array {
+    if ($stub = cfg('geocode_stub')) return $stub;   // local testing only
+    $url = 'https://geocoding.geo.census.gov/geocoder/locations/address?' . http_build_query([
+        'street' => $street, 'city' => $city, 'state' => $state, 'zip' => $zip,
+        'benchmark' => 'Public_AR_Current', 'format' => 'json',
+    ]);
+    $ctx = stream_context_create(['http' => ['timeout' => 8, 'header' => "User-Agent: electroservice.net\r\n"]]);
+    $raw = @file_get_contents($url, false, $ctx);
+    if (!$raw) return null;
+    $j = json_decode($raw, true);
+    $m = $j['result']['addressMatches'][0]['coordinates'] ?? null;
+    return $m ? [(float)$m['y'], (float)$m['x']] : null;
+}
+
+// Straight-line distance in miles.
+function miles_between(float $lat1, float $lng1, float $lat2, float $lng2): float {
+    $r = 3958.8;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLng = deg2rad($lng2 - $lng1);
+    $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+    return $r * 2 * atan2(sqrt($a), sqrt(1 - $a));
 }
 
 // ---------------------------------------------------------------- layout

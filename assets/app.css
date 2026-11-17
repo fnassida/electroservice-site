@@ -58,7 +58,7 @@ legend{font-weight:700;margin-bottom:.4rem}
 .choice span{display:grid;gap:.15rem}
 .choice small{font-weight:400;color:var(--muted)}
 
-.btn{display:inline-block;font:inherit;font-weight:700;padding:.8rem 1.3rem;border-radius:4px;border:0;cursor:pointer;text-decoration:none}
+.btn{display:inline-block;white-space:nowrap;font:inherit;font-weight:700;padding:.8rem 1.3rem;border-radius:4px;border:0;cursor:pointer;text-decoration:none}
 .btn.primary{background:var(--copper);color:#fff}
 .btn.primary:hover{background:#9A5323}
 .btn.plain{background:none;color:var(--ink);border:2px solid var(--ink)}
@@ -76,3 +76,18 @@ th{font-weight:700;background:#E9EEF2}
 .foot .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem}
 .foot .links{display:flex;gap:1.2rem}
 @media (max-width:600px){.choice{grid-template-columns:1fr}}
+
+/* stage 2 */
+.skills{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.4rem 1.2rem}
+.addr{display:grid;grid-template-columns:2fr 1fr 1fr;gap:.9rem}
+.addr .wide{grid-column:1/-1}
+.checklist{list-style:none;padding:0;margin:1.5rem 0;display:grid;gap:1rem;max-width:48rem;counter-reset:c}
+.checklist li{counter-increment:c;display:flex;justify-content:space-between;align-items:center;gap:1.5rem;background:#fff;
+  border:1px solid var(--line);border-left:5px solid var(--copper);border-radius:6px;padding:1rem 1.2rem}
+.checklist li.done{border-left-color:var(--good)}
+.checklist h3{margin:0 0 .2rem}
+.checklist h3::before{content:counter(c) ". ";color:var(--copper)}
+.checklist li.done h3::before{content:"Done: ";color:var(--good)}
+.checklist p{margin:0}
+.review{display:grid;grid-template-columns:1.4fr 1fr;gap:2rem;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1.2rem;margin-bottom:1rem}
+@media (max-width:700px){.addr,.review{grid-template-columns:1fr}.checklist li{flex-direction:column;align-items:flex-start}}

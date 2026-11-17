@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $counts = db()->query("SELECT role, COUNT(*) n FROM users GROUP BY role")->fetchAll(PDO::FETCH_KEY_PAIR);
+$pendingIns = (int)db()->query("SELECT COUNT(*) FROM insurance_docs WHERE status = 'pending'")->fetchColumn();
 $users  = db()->query("SELECT * FROM users WHERE role <> 'admin' ORDER BY created_at DESC LIMIT 200")->fetchAll();
 $log    = db()->query("SELECT a.*, u.full_name, u.role FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
                        ORDER BY a.id DESC LIMIT 50")->fetchAll();
@@ -24,21 +25,27 @@ page_start('Admin', $admin);
 <ul class="stats">
   <li><b><?= (int)($counts['tech'] ?? 0) ?></b> techs</li>
   <li><b><?= (int)($counts['provider'] ?? 0) ?></b> providers</li>
+  <li><b><?= $pendingIns ?></b> insurance to review</li>
 </ul>
+<p><a class="btn <?= $pendingIns ? 'primary' : 'plain' ?>" href="/portal/admin/insurance.php">Review insurance</a></p>
 
 <h2>Accounts</h2>
 <?php if (!$users): ?>
   <p class="muted">No techs or providers have signed up yet.</p>
 <?php else: ?>
 <table>
-  <thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Company</th><th>Joined (UTC)</th><th>Last login</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Company / insurance</th><th>Joined (UTC)</th><th>Last login</th><th></th></tr></thead>
   <tbody>
   <?php foreach ($users as $r): ?>
     <tr>
       <td><?= e($r['full_name']) ?> <?php if ($r['status'] !== 'active'): ?><span class="tag suspended">Suspended</span><?php endif; ?></td>
       <td><span class="tag <?= e($r['role']) ?>"><?= e(ucfirst($r['role'])) ?></span></td>
       <td><?= e($r['email']) ?></td>
-      <td><?= e($r['company']) ?></td>
+      <td><?php if ($r['role'] === 'tech') {
+            $is = insurance_state((int)$r['id']);
+            echo $is['insured'] ? 'Insured to ' . e($is['doc']['expires_on'])
+               : ($is['doc'] ? e(ucfirst($is['expired'] ? 'expired' : $is['doc']['status'])) : '<span class="muted">No insurance</span>');
+          } else { echo e($r['company']); } ?></td>
       <td><?= e(substr($r['created_at'], 0, 16)) ?></td>
       <td><?= e($r['last_login_at'] ? substr($r['last_login_at'], 0, 16) : 'Never') ?></td>
       <td>
