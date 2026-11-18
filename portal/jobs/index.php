@@ -9,6 +9,8 @@ function job_rows(array $rows, string $role): void {
     echo '<table><thead><tr><th>Job</th><th>Where</th><th>Starts</th><th>' . ($role === 'provider' ? 'Tech pay' : 'Your pay') . '</th><th>Status</th></tr></thead><tbody>';
     foreach ($rows as $r) {
         $extra = '';
+        global $uid;
+        if ($n = unread_count($uid, (int)$r['id'])) $extra .= ' <span class="tag provider">' . $n . ' new message' . ($n > 1 ? 's' : '') . '</span>';
         if ($role === 'provider' && !empty($r['n_requests'])) $extra = ' <span class="tag tech">' . (int)$r['n_requests'] . ' request' . ($r['n_requests'] > 1 ? 's' : '') . '</span>';
         echo '<tr><td><a href="/portal/jobs/view.php?id=' . (int)$r['id'] . '">' . e($r['title']) . '</a>' . $extra . '</td>'
            . '<td>' . e($r['city'] . ', ' . $r['state']) . '</td><td>' . e(fmt_start($r['start_at'])) . '</td>'

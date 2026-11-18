@@ -261,6 +261,76 @@ function assign_wo(int $woId, int $techId): bool {
     return true;
 }
 
+// ---------------------------------------------------------------- chat
+// Who may use the thread between this job's provider and a given tech.
+function can_chat(array $user, array $wo, int $techId): bool {
+    if ($user['role'] === 'provider') {
+        if ((int)$wo['provider_id'] !== (int)$user['id']) return false;
+    } elseif ($user['role'] === 'tech') {
+        if ((int)$user['id'] !== $techId) return false;
+    } else {
+        return false;   // admin reads only, never posts
+    }
+    if ((int)$wo['tech_id'] === $techId) return true;
+    $st = db()->prepare('SELECT 1 FROM wo_requests WHERE work_order_id = ? AND tech_id = ? LIMIT 1');
+    $st->execute([$wo['id'], $techId]);
+    return (bool)$st->fetch();
+}
+
+function looks_like_contact_info(string $s): bool {
+    return (bool)preg_match('/[\w.+-]+@[\w-]+\.[\w.]+|\(?\b\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}\b/', $s);
+}
+
+function post_message(array $wo, int $techId, int $senderId, string $body, string $via = 'web'): int {
+    $body = mb_substr(trim($body), 0, 4000);
+    db()->prepare('INSERT INTO messages (work_order_id, tech_id, sender_id, body, via, flagged, created_at) VALUES (?,?,?,?,?,?,?)')
+        ->execute([$wo['id'], $techId, $senderId, $body, $via, looks_like_contact_info($body) ? 1 : 0, now()]);
+    $id = (int)db()->lastInsertId();
+    notify_new_message($wo, $techId, $senderId);
+    return $id;
+}
+
+// Email the other side, but only for the first unread message, so a burst of messages sends one email.
+function notify_new_message(array $wo, int $techId, int $senderId): void {
+    $recipientId = $senderId === (int)$wo['provider_id'] ? $techId : (int)$wo['provider_id'];
+    $st = db()->prepare('SELECT COUNT(*) FROM messages WHERE work_order_id = ? AND tech_id = ? AND sender_id <> ? AND read_at IS NULL');
+    $st->execute([$wo['id'], $techId, $recipientId]);
+    if ((int)$st->fetchColumn() !== 1) return;
+    $st = db()->prepare('SELECT email, full_name FROM users WHERE id = ?');
+    $st->execute([$recipientId]);
+    $to = $st->fetch();
+    if (!$to || cfg('mail_disabled')) return;
+    $link = rtrim((string)cfg('site_url', ''), '/') . '/portal/jobs/view.php?id=' . (int)$wo['id'] . '&thread=' . $techId . '#chat';
+    $subject = 'New message about "' . $wo['title'] . '"';
+    $text = "Hi " . strtok($to['full_name'], ' ') . ",\n\nYou have a new message about the job \"" . $wo['title'] . "\".\n\nRead and reply: $link\n\nElectro Service";
+    $from = (string)cfg('mail_from', 'info@electroservice.net');
+    @mail($to['email'], $subject, $text, "From: Electro Service <$from>\r\nContent-Type: text/plain; charset=UTF-8");
+}
+
+// Mark the other side's messages in this thread as read by this participant.
+function mark_read(array $wo, int $techId, int $readerId): void {
+    db()->prepare('UPDATE messages SET read_at = ? WHERE work_order_id = ? AND tech_id = ? AND sender_id <> ? AND read_at IS NULL')
+        ->execute([now(), $wo['id'], $techId, $readerId]);
+}
+
+function thread_messages(int $woId, int $techId, int $afterId = 0): array {
+    $st = db()->prepare('SELECT m.id, m.sender_id, m.body, m.via, m.flagged, m.read_at, m.created_at, u.full_name, u.role
+                         FROM messages m JOIN users u ON u.id = m.sender_id
+                         WHERE m.work_order_id = ? AND m.tech_id = ? AND m.id > ? ORDER BY m.id');
+    $st->execute([$woId, $techId, $afterId]);
+    return $st->fetchAll();
+}
+
+function unread_count(int $userId, ?int $woId = null): int {
+    $sql = 'SELECT COUNT(*) FROM messages m JOIN work_orders w ON w.id = m.work_order_id
+            WHERE m.sender_id <> ? AND m.read_at IS NULL AND (w.provider_id = ? OR m.tech_id = ?)';
+    $args = [$userId, $userId, $userId];
+    if ($woId) { $sql .= ' AND m.work_order_id = ?'; $args[] = $woId; }
+    $st = db()->prepare($sql);
+    $st->execute($args);
+    return (int)$st->fetchColumn();
+}
+
 function fmt_start(string $dt): string {
     $t = strtotime($dt);
     return date('D M j, Y', $t) . ' at ' . date('g:i a', $t);
@@ -290,9 +360,9 @@ function page_start(string $title, ?array $user = null): void {
     </a>
     <nav aria-label="Account">
       <?php if ($u): ?>
-        <?php if ($u['role'] === 'admin'): ?><a href="/portal/admin/">Admin</a><a href="/portal/admin/jobs.php">Jobs</a><?php endif; ?>
+        <?php if ($u['role'] === 'admin'): ?><a href="/portal/admin/">Admin</a><a href="/portal/admin/jobs.php">Jobs</a><a href="/portal/admin/messages.php">Messages</a><?php endif; ?>
         <?php if ($u['role'] === 'tech'): ?><a href="/portal/jobs/browse.php">Find work</a><?php endif; ?>
-        <?php if ($u['role'] !== 'admin'): ?><a href="/portal/jobs/">My jobs</a><?php endif; ?>
+        <?php if ($u['role'] !== 'admin'): $nUnread = unread_count((int)$u['id']); ?><a href="/portal/jobs/">My jobs<?= $nUnread ? ' <span class="tag provider">' . $nUnread . '</span>' : '' ?></a><?php endif; ?>
         <?php if ($u['role'] === 'provider'): ?><a href="/portal/jobs/new.php">Post a job</a><?php endif; ?>
         <a href="/portal/">Dashboard</a>
         <form method="post" action="/portal/logout.php" class="inline"><?= csrf_field() ?><button class="link">Log out</button></form>

@@ -101,6 +101,31 @@ if ($w['tech_id']) {
 }
 $showAddress = $role === 'admin' || $isOwner || $isAssigned;
 
+// Chat threads this user can see on this job.
+$threads = [];   // techId => name
+if ($role === 'tech') {
+    if (can_chat($u, $w, $uid)) $threads[$uid] = $w['company'];
+} else {
+    $st = db()->prepare("SELECT DISTINCT u.id, u.full_name FROM users u WHERE u.id IN (
+            SELECT tech_id FROM wo_requests WHERE work_order_id = ? UNION SELECT tech_id FROM messages WHERE work_order_id = ?
+            UNION SELECT tech_id FROM work_orders WHERE id = ? AND tech_id IS NOT NULL)");
+    $st->execute([$w['id'], $w['id'], $w['id']]);
+    foreach ($st->fetchAll() as $t) $threads[(int)$t['id']] = $t['full_name'];
+}
+$thread = (int)($_GET['thread'] ?? 0);
+if (!isset($threads[$thread])) $thread = $w['tech_id'] && isset($threads[(int)$w['tech_id']]) ? (int)$w['tech_id'] : (int)(array_key_first($threads) ?? 0);
+$chatMsgs = $thread ? thread_messages((int)$w['id'], $thread) : [];
+$canPost = $thread && $role !== 'admin' && !in_array($w['status'], ['cancelled'], true);
+if ($thread && $role !== 'admin') mark_read($w, $thread, $uid);
+$unreadBy = [];
+if ($role === 'provider') {
+    foreach (array_keys($threads) as $t) {
+        $st = db()->prepare('SELECT COUNT(*) FROM messages WHERE work_order_id = ? AND tech_id = ? AND sender_id <> ? AND read_at IS NULL');
+        $st->execute([$w['id'], $t, $uid]);
+        $unreadBy[$t] = (int)$st->fetchColumn();
+    }
+}
+
 page_start($w['title'], $u);
 ?>
 <p><a href="<?= $role === 'admin' ? '/portal/admin/jobs.php' : ($role === 'tech' && !$isAssigned && !$myPending ? '/portal/jobs/browse.php' : '/portal/jobs/') ?>">Back</a></p>
@@ -225,4 +250,39 @@ page_start($w['title'], $u);
   <?php endif; ?>
 <?php endif; ?>
 </section>
+
+<?php if ($threads): ?>
+<section id="chat" class="chat-wrap">
+  <h2>Messages</h2>
+  <?php if ($role === 'admin'): ?><p class="muted">Read-only. Participants can't see that you've viewed this.</p><?php endif; ?>
+  <?php if (count($threads) > 1 || $role !== 'tech'): ?>
+    <nav class="threads" aria-label="Conversations">
+      <?php foreach ($threads as $tid => $name): ?>
+        <a href="?id=<?= (int)$w['id'] ?>&thread=<?= $tid ?>#chat" <?= $tid === $thread ? 'aria-current="true"' : '' ?>><?= e($name) ?><?= !empty($unreadBy[$tid]) ? ' <span class="tag tech">' . $unreadBy[$tid] . ' new</span>' : '' ?></a>
+      <?php endforeach; ?>
+    </nav>
+  <?php endif; ?>
+  <div class="chat" id="chatlog" data-job="<?= (int)$w['id'] ?>" data-thread="<?= $thread ?>" aria-live="polite">
+    <?php if (!$chatMsgs): ?><p class="muted empty">No messages yet.</p><?php endif; ?>
+    <?php foreach ($chatMsgs as $m): $mine = (int)$m['sender_id'] === $uid; ?>
+      <div class="msg <?= $mine ? 'mine' : '' ?>" data-id="<?= (int)$m['id'] ?>">
+        <div class="meta"><?= e($m['full_name']) ?><?= $m['via'] === 'sms' ? ' by text' : '' ?>, <time datetime="<?= e($m['created_at']) ?>Z"><?= e(substr($m['created_at'], 0, 16)) ?> UTC</time>
+          <?php if ($role === 'admin' && $m['flagged']): ?><span class="tag suspended">Contact info</span><?php endif; ?></div>
+        <div class="body"><?= nl2br(e($m['body'])) ?></div>
+        <?php if ($mine && $m['read_at']): ?><div class="seen">Seen</div><?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php if ($canPost): ?>
+    <form method="post" action="/portal/jobs/messages.php" class="chat-form" id="chatform">
+      <?= csrf_field() ?>
+      <input type="hidden" name="id" value="<?= (int)$w['id'] ?>"><input type="hidden" name="thread" value="<?= $thread ?>">
+      <label class="sr" for="chatbody">Message</label>
+      <textarea id="chatbody" name="body" rows="2" maxlength="4000" placeholder="Write a message" required></textarea>
+      <button class="btn primary">Send</button>
+    </form>
+  <?php endif; ?>
+</section>
+<script src="/assets/chat.js" defer></script>
+<?php endif; ?>
 <?php page_end();

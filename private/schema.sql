@@ -106,3 +106,16 @@ CREATE TABLE IF NOT EXISTS wo_requests (
     created_at DATETIME NOT NULL,
     decided_at DATETIME NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Stage 4: chat. One thread per work order and tech.
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    work_order_id INTEGER NOT NULL,
+    tech_id INTEGER NOT NULL,          -- identifies the thread with the provider
+    sender_id INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    via VARCHAR(8) NOT NULL DEFAULT 'web',   -- web | sms
+    flagged TINYINT NOT NULL DEFAULT 0,      -- contains a phone number or email address
+    read_at DATETIME NULL,                   -- when the other participant first saw it
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
