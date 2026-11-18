@@ -32,14 +32,26 @@ page_start('Dashboard', $u);
       <div><h3>Get paid</h3><p>Connect a bank account through Stripe. Coming soon.</p></div>
     </li>
   </ol>
-<?php else: ?>
-  <p>Your provider account for <strong><?= e($u['company']) ?></strong> is set up. Next, you'll be able to:</p>
-  <ul class="steps-todo">
-    <li>Post work orders (minimum $<?= number_format((float)cfg('min_job_amount', 50), 2) ?>)</li>
-    <li>Search insured techs by skill and distance, and offer them jobs</li>
-    <li>Chat and text with techs about each job</li>
-    <li>Pay securely through the site when the work is done</li>
+  <?php if ($profileDone && $ins['insured']): ?>
+    <p><a class="btn primary" href="/portal/jobs/browse.php">Find work near you</a> <a class="btn plain" href="/portal/jobs/">Your jobs and offers</a></p>
+  <?php endif; ?>
+<?php else:
+    $st = db()->prepare("SELECT status, COUNT(*) n FROM work_orders WHERE provider_id = ? GROUP BY status");
+    $st->execute([$u['id']]);
+    $c = $st->fetchAll(PDO::FETCH_KEY_PAIR);
+    $st = db()->prepare("SELECT COUNT(*) FROM wo_requests r JOIN work_orders w ON w.id = r.work_order_id
+                         WHERE w.provider_id = ? AND w.status = 'open' AND r.kind = 'request' AND r.status = 'pending'");
+    $st->execute([$u['id']]);
+    $nReq = (int)$st->fetchColumn();
+?>
+  <p>Provider account for <strong><?= e($u['company']) ?></strong>.</p>
+  <ul class="stats">
+    <li><b><?= (int)($c['open'] ?? 0) ?></b> open jobs</li>
+    <li><b><?= $nReq ?></b> tech requests to review</li>
+    <li><b><?= (int)($c['assigned'] ?? 0) + (int)($c['in_progress'] ?? 0) ?></b> booked or in progress</li>
+    <li><b><?= (int)($c['submitted'] ?? 0) ?></b> waiting for your approval</li>
   </ul>
-  <p class="muted">These features are being built now.</p>
+  <p><a class="btn primary" href="/portal/jobs/new.php">Post a job</a> <a class="btn plain" href="/portal/jobs/">View your jobs</a></p>
+  <p class="muted">Jobs must pay the tech at least $<?= number_format((float)cfg('min_job_amount', 50), 2) ?>. A <?= round((float)cfg('platform_fee_rate', 0.10) * 100) ?>% platform fee is added on top.</p>
 <?php endif; ?>
 <?php page_end();

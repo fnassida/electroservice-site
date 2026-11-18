@@ -91,3 +91,27 @@ th{font-weight:700;background:#E9EEF2}
 .checklist p{margin:0}
 .review{display:grid;grid-template-columns:1.4fr 1fr;gap:2rem;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1.2rem;margin-bottom:1rem}
 @media (max-width:700px){.addr,.review{grid-template-columns:1fr}.checklist li{flex-direction:column;align-items:flex-start}}
+
+/* stage 3 */
+.head-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.6rem}
+.head-row h1,.head-row h2{margin:0}
+.jobs{list-style:none;padding:0;margin:1.2rem 0;display:grid;gap:.8rem}
+.jobs li{display:grid;grid-template-columns:5rem 1fr auto;gap:1.2rem;align-items:start;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1rem 1.2rem}
+.jobs h3{margin:0 0 .2rem}
+.jobs p{margin:.15rem 0}
+.jobs .dist{color:var(--muted)}
+.jobs .dist b{display:block;font-family:Archivo,sans-serif;font-weight:900;font-stretch:125%;font-size:1.8rem;line-height:1;color:var(--ink)}
+.jobs .pay{text-align:right;display:grid;gap:.4rem;justify-items:end}
+.jobs .pay b{font-family:Archivo,sans-serif;font-weight:800;font-size:1.3rem}
+.job{display:grid;grid-template-columns:1.5fr 1fr;gap:2.5rem;margin:1.2rem 0 2rem}
+.prose{background:#fff;border:1px solid var(--line);border-radius:6px;padding:1rem 1.2rem;max-width:70ch}
+.facts-list{display:grid;grid-template-columns:max-content 1fr;gap:.55rem 1.2rem;margin:0;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1.1rem 1.2rem;align-self:start}
+.facts-list dt{font-weight:700;color:var(--muted)}
+.facts-list dd{margin:0}
+.actions-panel{border-top:1px solid var(--line);padding-top:1.6rem}
+.plain-list{padding-left:1.2rem}
+.total{font-weight:700;margin:0}
+.tag.status-open{background:#D9E6F7}.tag.status-assigned,.tag.status-in_progress{background:#FCE3D0}
+.tag.status-submitted{background:#FFE7A3}.tag.status-approved{background:#DDEFE3}.tag.status-cancelled{background:#E2E2E2}
+details summary{cursor:pointer;color:var(--copper)}
+@media (max-width:760px){.job{grid-template-columns:1fr}.jobs li{grid-template-columns:1fr}.jobs .pay{text-align:left;justify-items:start}}

@@ -188,7 +188,7 @@ function insurance_state(int $userId): array {
 
 // US Census geocoder: free, no key. Returns [lat, lng] or null.
 function geocode_us(string $street, string $city, string $state, string $zip): ?array {
-    if ($stub = cfg('geocode_stub')) return $stub;   // local testing only
+    if ($stub = cfg('geocode_stub')) return isset($stub[0]) ? $stub : ($stub[$zip] ?? null);   // local testing only
     $url = 'https://geocoding.geo.census.gov/geocoder/locations/address?' . http_build_query([
         'street' => $street, 'city' => $city, 'state' => $state, 'zip' => $zip,
         'benchmark' => 'Public_AR_Current', 'format' => 'json',
@@ -208,6 +208,62 @@ function miles_between(float $lat1, float $lng1, float $lat2, float $lng2): floa
     $dLng = deg2rad($lng2 - $lng1);
     $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
     return $r * 2 * atan2(sqrt($a), sqrt(1 - $a));
+}
+
+// ---------------------------------------------------------------- work orders
+const WO_STATUS = [
+    'open'        => 'Open',
+    'assigned'    => 'Assigned',
+    'in_progress' => 'In progress',
+    'submitted'   => 'Waiting for approval',
+    'approved'    => 'Approved',
+    'cancelled'   => 'Cancelled',
+];
+
+function money(int $cents): string { return '$' . number_format($cents / 100, 2); }
+
+function skill_labels(?string $csv): string {
+    $out = [];
+    foreach (array_filter(explode(',', (string)$csv)) as $k) $out[] = SKILLS[$k] ?? $k;
+    return implode(', ', $out);
+}
+
+// A tech can be offered or request work once their profile has a location and their insurance is approved and current.
+function tech_ready(int $userId): bool {
+    $p = tech_profile($userId);
+    return $p && $p['lat'] !== null && $p['skills'] && insurance_state($userId)['insured'];
+}
+
+function load_wo(int $id): ?array {
+    $st = db()->prepare('SELECT w.*, u.company, u.full_name AS provider_name FROM work_orders w JOIN users u ON u.id = w.provider_id WHERE w.id = ?');
+    $st->execute([$id]);
+    return $st->fetch() ?: null;
+}
+
+function pending_request(int $woId, int $techId): ?array {
+    $st = db()->prepare("SELECT * FROM wo_requests WHERE work_order_id = ? AND tech_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1");
+    $st->execute([$woId, $techId]);
+    return $st->fetch() ?: null;
+}
+
+// Give the job to a tech and close every other open request or offer on it.
+function assign_wo(int $woId, int $techId): bool {
+    $pdo = db();
+    $pdo->beginTransaction();
+    $st = $pdo->prepare("UPDATE work_orders SET tech_id = ?, status = 'assigned', updated_at = ? WHERE id = ? AND status = 'open'");
+    $st->execute([$techId, now(), $woId]);
+    if ($st->rowCount() !== 1) { $pdo->rollBack(); return false; }
+    $pdo->prepare("UPDATE wo_requests SET status = 'accepted', decided_at = ? WHERE work_order_id = ? AND tech_id = ? AND status = 'pending'")
+        ->execute([now(), $woId, $techId]);
+    $pdo->prepare("UPDATE wo_requests SET status = 'closed', decided_at = ? WHERE work_order_id = ? AND status = 'pending'")
+        ->execute([now(), $woId]);
+    $pdo->commit();
+    return true;
+}
+
+function fmt_start(string $dt): string {
+    $t = strtotime($dt);
+    return date('D M j, Y', $t) . ' at ' . date('g:i a', $t);
 }
 
 // ---------------------------------------------------------------- layout
@@ -234,7 +290,10 @@ function page_start(string $title, ?array $user = null): void {
     </a>
     <nav aria-label="Account">
       <?php if ($u): ?>
-        <?php if ($u['role'] === 'admin'): ?><a href="/portal/admin/">Admin</a><?php endif; ?>
+        <?php if ($u['role'] === 'admin'): ?><a href="/portal/admin/">Admin</a><a href="/portal/admin/jobs.php">Jobs</a><?php endif; ?>
+        <?php if ($u['role'] === 'tech'): ?><a href="/portal/jobs/browse.php">Find work</a><?php endif; ?>
+        <?php if ($u['role'] !== 'admin'): ?><a href="/portal/jobs/">My jobs</a><?php endif; ?>
+        <?php if ($u['role'] === 'provider'): ?><a href="/portal/jobs/new.php">Post a job</a><?php endif; ?>
         <a href="/portal/">Dashboard</a>
         <form method="post" action="/portal/logout.php" class="inline"><?= csrf_field() ?><button class="link">Log out</button></form>
       <?php else: ?>

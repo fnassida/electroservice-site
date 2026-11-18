@@ -65,3 +65,44 @@ CREATE TABLE IF NOT EXISTS insurance_docs (
     reviewed_at DATETIME NULL,
     created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Stage 3: work orders.
+CREATE TABLE IF NOT EXISTS work_orders (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    provider_id INTEGER NOT NULL,
+    tech_id INTEGER NULL,
+    title VARCHAR(160) NOT NULL,
+    description TEXT NOT NULL,
+    skills TEXT NOT NULL,              -- comma-separated skill keys
+    street VARCHAR(160) NOT NULL,      -- shown to the tech only once assigned
+    city VARCHAR(80) NOT NULL,
+    state VARCHAR(2) NOT NULL,
+    zip VARCHAR(10) NOT NULL,
+    lat DOUBLE NOT NULL,
+    lng DOUBLE NOT NULL,
+    start_at DATETIME NOT NULL,        -- local time at the job site
+    est_hours DECIMAL(5,1) NULL,
+    pay_cents INTEGER NOT NULL,        -- what the tech receives
+    fee_cents INTEGER NOT NULL,        -- platform fee, paid by the provider on top
+    min_coverage INTEGER NOT NULL DEFAULT 0,
+    status VARCHAR(16) NOT NULL DEFAULT 'open',   -- open | assigned | in_progress | submitted | approved | cancelled
+    checked_in_at DATETIME NULL,
+    submitted_at DATETIME NULL,
+    completion_notes TEXT NULL,
+    approved_at DATETIME NULL,
+    cancelled_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A tech asking for a job (kind=request) or a provider offering one (kind=offer).
+CREATE TABLE IF NOT EXISTS wo_requests (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    work_order_id INTEGER NOT NULL,
+    tech_id INTEGER NOT NULL,
+    kind VARCHAR(8) NOT NULL,
+    status VARCHAR(12) NOT NULL DEFAULT 'pending',   -- pending | accepted | declined | closed
+    note VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL,
+    decided_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
