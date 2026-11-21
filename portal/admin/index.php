@@ -41,7 +41,8 @@ page_start('Admin', $admin);
   <tbody>
   <?php foreach ($users as $r): ?>
     <tr>
-      <td><?= e($r['full_name']) ?> <?php if ($r['status'] !== 'active'): ?><span class="tag suspended">Suspended</span><?php endif; ?></td>
+      <td><?= e($r['full_name']) ?> <?php if ($r['status'] !== 'active'): ?><span class="tag suspended">Suspended</span><?php endif; ?>
+        <?php if (!is_verified($r)): ?><span class="tag">Email not confirmed</span><?php endif; ?></td>
       <td><span class="tag <?= e($r['role']) ?>"><?= e(ucfirst($r['role'])) ?></span></td>
       <td><?= e($r['email']) ?></td>
       <td><?php if ($r['role'] === 'tech') {

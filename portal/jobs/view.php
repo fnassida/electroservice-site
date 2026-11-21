@@ -27,6 +27,7 @@ $back = '/portal/jobs/view.php?id=' . (int)$w['id'];
 // ---------------------------------------------------------------- actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
     csrf_check();
+    if (!require_verified_action($u)) redirect($back);
     $a = $_POST['action'] ?? '';
     $woId = (int)$w['id'];
     $note = mb_substr(trim($_POST['note'] ?? ''), 0, 500);

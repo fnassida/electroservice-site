@@ -145,3 +145,28 @@ CREATE TABLE IF NOT EXISTS sms_log (
     status VARCHAR(24) NULL,
     created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Account basics: password reset, email verification, reminder emails.
+CREATE TABLE IF NOT EXISTS password_resets (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,     -- sha256 of the token in the emailed link
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS email_verifications (
+    user_id INTEGER PRIMARY KEY,
+    token_hash VARCHAR(64) NULL,
+    sent_at DATETIME NULL,
+    verified_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS reminders_sent (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    user_id INTEGER NOT NULL,
+    ref_id INTEGER NOT NULL,             -- e.g. the insurance document
+    kind VARCHAR(32) NOT NULL,           -- e.g. ins_30, ins_7, ins_expired
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

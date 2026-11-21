@@ -9,6 +9,7 @@ $in = ['title' => '', 'description' => '', 'skills' => [], 'street' => '', 'city
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (!require_verified_action($u)) redirect('/portal/jobs/new.php');
     foreach ($in as $k => $_) $in[$k] = is_array($_POST[$k] ?? null) ? $_POST[$k] : trim((string)($_POST[$k] ?? ''));
     $in['skills'] = array_values(array_intersect(array_keys(SKILLS), (array)$in['skills']));
     $in['state'] = strtoupper($in['state']);

@@ -39,7 +39,7 @@ page_start('Log in');
     <?= csrf_field() ?>
     <label>Email <input type="email" name="email" autocomplete="email" required value="<?= e($email) ?>"></label>
     <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
-    <div><button class="btn primary">Log in</button></div>
+    <div><button class="btn primary">Log in</button> <a href="/portal/forgot.php" style="margin-left:1rem">Forgot your password?</a></div>
   </form>
 </div>
 <?php page_end();

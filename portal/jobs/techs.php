@@ -8,6 +8,7 @@ $back = '/portal/jobs/techs.php?id=' . $woId;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (!require_verified_action($u)) redirect($back);
     $techId = (int)($_POST['tech_id'] ?? 0);
     $st = db()->prepare("SELECT 1 FROM users WHERE id = ? AND role = 'tech' AND status = 'active'");
     $st->execute([$techId]);

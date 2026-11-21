@@ -36,7 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)db()->lastInsertId();
         log_activity($id, 'register', $in['role']);
         login_user(['id' => $id]);
-        flash('Your account is ready.');
+        send_verification(['id' => $id, 'email' => $in['email'], 'full_name' => $in['full_name']]);
+        flash('Your account is ready. We sent a link to ' . $in['email'] . ' to confirm your email.');
         redirect('/portal/');
     }
 }

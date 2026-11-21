@@ -105,6 +105,53 @@ function log_activity(?int $userId, string $action, ?string $detail = null): voi
         ->execute([$userId, $action, $detail ? mb_substr($detail, 0, 500) : null, client_ip(), now()]);
 }
 
+// ---------------------------------------------------------------- email
+function site_link(string $path): string { return rtrim((string)cfg('site_url', 'https://electroservice.net'), '/') . $path; }
+
+function send_mail(string $to, string $subject, string $text): bool {
+    if ($log = cfg('mail_log_file')) {   // local testing only
+        file_put_contents($log, json_encode(['to' => $to, 'subject' => $subject, 'text' => $text]) . "\n", FILE_APPEND);
+        return true;
+    }
+    if (cfg('mail_disabled')) return true;
+    $from = (string)cfg('mail_from', 'info@electroservice.net');
+    $headers = "From: Electro Service <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8";
+    return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $text, $headers, '-f' . $from);
+}
+
+// ---------------------------------------------------------------- email verification
+function is_verified(array $u): bool {
+    if ($u['role'] === 'admin') return true;
+    $st = db()->prepare('SELECT verified_at FROM email_verifications WHERE user_id = ?');
+    $st->execute([$u['id']]);
+    return (bool)$st->fetchColumn();
+}
+
+function send_verification(array $u): bool {
+    $token = bin2hex(random_bytes(32));
+    db()->prepare('DELETE FROM email_verifications WHERE user_id = ?')->execute([$u['id']]);
+    db()->prepare('INSERT INTO email_verifications (user_id, token_hash, sent_at) VALUES (?,?,?)')
+        ->execute([$u['id'], hash('sha256', $token), now()]);
+    $link = site_link('/portal/verify.php?u=' . (int)$u['id'] . '&t=' . $token);
+    return send_mail($u['email'], 'Confirm your email for Electro Service',
+        "Hi " . strtok($u['full_name'], ' ') . ",\n\nPlease confirm your email address so you can use the work board:\n\n$link\n\n"
+        . "If you didn't create an account at electroservice.net, ignore this email.\n\nElectro Service");
+}
+
+// Call before any job action. Returns true if allowed; otherwise sets a message.
+function require_verified_action(array $u): bool {
+    if (is_verified($u)) return true;
+    flash('Confirm your email address first. Check your inbox for the link, or send a new one from your dashboard.');
+    return false;
+}
+
+function verify_banner(array $u): string {
+    if ($u['role'] === 'admin' || is_verified($u)) return '';
+    return '<div class="error" role="status">Confirm your email address to post, request or accept jobs and to chat. We sent a link to <strong>'
+         . e($u['email']) . '</strong>.<form method="post" action="/portal/verify.php" class="inline" style="margin-left:.6rem">'
+         . csrf_field() . '<button class="link">Send a new link</button></form></div>';
+}
+
 // ---------------------------------------------------------------- auth
 function current_user(): ?array {
     static $user = false;
@@ -329,12 +376,10 @@ function notify_new_message(array $wo, int $techId, int $senderId): void {
     $st = db()->prepare('SELECT email, full_name FROM users WHERE id = ?');
     $st->execute([$recipientId]);
     $to = $st->fetch();
-    if (!$to || cfg('mail_disabled')) return;
-    $link = rtrim((string)cfg('site_url', ''), '/') . '/portal/jobs/view.php?id=' . (int)$wo['id'] . '&thread=' . $techId . '#chat';
-    $subject = 'New message about "' . $wo['title'] . '"';
-    $text = "Hi " . strtok($to['full_name'], ' ') . ",\n\nYou have a new message about the job \"" . $wo['title'] . "\".\n\nRead and reply: $link\n\nElectro Service";
-    $from = (string)cfg('mail_from', 'info@electroservice.net');
-    @mail($to['email'], $subject, $text, "From: Electro Service <$from>\r\nContent-Type: text/plain; charset=UTF-8");
+    if (!$to) return;
+    $link = site_link('/portal/jobs/view.php?id=' . (int)$wo['id'] . '&thread=' . $techId . '#chat');
+    send_mail($to['email'], 'New message about "' . $wo['title'] . '"',
+        "Hi " . strtok($to['full_name'], ' ') . ",\n\nYou have a new message about the job \"" . $wo['title'] . "\".\n\nRead and reply: $link\n\nElectro Service");
 }
 
 // Mark the other side's messages in this thread as read by this participant.
@@ -406,6 +451,7 @@ function page_start(string $title, ?array $user = null): void {
 </header>
 <main class="wrap page">
 <?php if ($m = flash()): ?><p class="notice" role="status"><?= e($m) ?></p><?php endif;
+    if ($u) echo verify_banner($u);
 }
 
 function page_end(): void {
@@ -416,4 +462,50 @@ function page_end(): void {
 </body>
 </html>
 <?php
+    run_daily_jobs();
+}
+
+// ---------------------------------------------------------------- daily jobs
+// No cron needed: the first page view each day (UTC) runs these after the page is sent.
+function run_daily_jobs(bool $force = false): void {
+    $today = gmdate('Y-m-d');
+    if (!$force && setting('daily_ran_on') === $today) return;
+    set_setting('daily_ran_on', $today);
+    if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+    try { send_insurance_reminders(); } catch (Throwable $e) { error_log('insurance reminders: ' . $e->getMessage()); }
+}
+
+function send_insurance_reminders(): int {
+    $today = gmdate('Y-m-d');
+    $sent = 0;
+    // The newest approved certificate for each active tech.
+    $rows = db()->query("SELECT d.*, u.email, u.full_name FROM insurance_docs d JOIN users u ON u.id = d.user_id
+                         WHERE d.status = 'approved' AND u.status = 'active' AND u.role = 'tech'
+                           AND d.id = (SELECT MAX(d2.id) FROM insurance_docs d2 WHERE d2.user_id = d.user_id AND d2.status IN ('approved','pending'))")->fetchAll();
+    foreach ($rows as $d) {
+        $days = (int)floor((strtotime($d['expires_on'] . ' UTC') - strtotime($today . ' UTC')) / 86400);
+        if ($days < -7) continue;                       // long expired: stop nagging
+        $kind = $days < 0 ? 'ins_expired' : ($days <= 7 ? 'ins_7' : ($days <= 30 ? 'ins_30' : null));
+        if (!$kind) continue;
+        $st = db()->prepare('SELECT 1 FROM reminders_sent WHERE user_id = ? AND ref_id = ? AND kind = ?');
+        $st->execute([$d['user_id'], $d['id'], $kind]);
+        if ($st->fetch()) continue;
+        $name = strtok($d['full_name'], ' ');
+        $link = site_link('/portal/insurance.php');
+        if ($kind === 'ins_expired') {
+            $subject = 'Your insurance on file has expired';
+            $body = "Hi $name,\n\nThe insurance certificate on your Electro Service profile (" . $d['carrier'] . ") expired on " . $d['expires_on']
+                  . ". Until you upload your renewal, providers can't offer you work orders and you won't see new jobs.\n\nUpload your renewal: $link\n\nElectro Service";
+        } else {
+            $subject = $days === 0 ? 'Your insurance expires today' : "Your insurance expires in $days day" . ($days === 1 ? '' : 's');
+            $body = "Hi $name,\n\nThe insurance certificate on your Electro Service profile (" . $d['carrier'] . ") expires on " . $d['expires_on']
+                  . ". Upload your renewal before then so you can keep getting work orders.\n\nUpload your renewal: $link\n\nElectro Service";
+        }
+        if (send_mail($d['email'], $subject, $body)) {
+            db()->prepare('INSERT INTO reminders_sent (user_id, ref_id, kind, created_at) VALUES (?,?,?,?)')->execute([$d['user_id'], $d['id'], $kind, now()]);
+            log_activity((int)$d['user_id'], 'reminder_sent', $kind);
+            $sent++;
+        }
+    }
+    return $sent;
 }

@@ -18,6 +18,11 @@ function out(array $rows, int $me): array {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($isAdmin) { http_response_code(403); exit; }
     csrf_check();
+    if (!is_verified($u)) {
+        if (($_POST['ajax'] ?? '') === '1') { http_response_code(403); exit; }
+        require_verified_action($u);
+        redirect('/portal/jobs/view.php?id=' . (int)$w['id'] . '&thread=' . $techId . '#chat');
+    }
     $body = trim((string)($_POST['body'] ?? ''));
     if ($body !== '') {
         post_message($w, $techId, (int)$u['id'], $body);
