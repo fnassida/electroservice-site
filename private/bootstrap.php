@@ -8,10 +8,14 @@ if (!is_file($configFile)) {
     exit('The work board is being set up. Please check back soon.');
 }
 $CONFIG = require $configFile;
+require __DIR__ . '/sms.php';
 
+// Blank values and leftover placeholders ("PASTE ...", "CHANGE ...") count as not set.
 function cfg(string $key, $default = null) {
     global $CONFIG;
-    return $CONFIG[$key] ?? $default;
+    $v = $CONFIG[$key] ?? null;
+    if ($v === null || (is_string($v) && (trim($v) === '' || preg_match('/^(PASTE|CHANGE)\b/i', trim($v))))) return $default;
+    return $v;
 }
 
 // ---------------------------------------------------------------- session
@@ -287,6 +291,7 @@ function post_message(array $wo, int $techId, int $senderId, string $body, strin
         ->execute([$wo['id'], $techId, $senderId, $body, $via, looks_like_contact_info($body) ? 1 : 0, now()]);
     $id = (int)db()->lastInsertId();
     notify_new_message($wo, $techId, $senderId);
+    sms_relay_message($wo, $techId, $senderId, $body);
     return $id;
 }
 
@@ -364,6 +369,7 @@ function page_start(string $title, ?array $user = null): void {
         <?php if ($u['role'] === 'tech'): ?><a href="/portal/jobs/browse.php">Find work</a><?php endif; ?>
         <?php if ($u['role'] !== 'admin'): $nUnread = unread_count((int)$u['id']); ?><a href="/portal/jobs/">My jobs<?= $nUnread ? ' <span class="tag provider">' . $nUnread . '</span>' : '' ?></a><?php endif; ?>
         <?php if ($u['role'] === 'provider'): ?><a href="/portal/jobs/new.php">Post a job</a><?php endif; ?>
+        <?php if ($u['role'] !== 'admin'): ?><a href="/portal/settings.php">Settings</a><?php endif; ?>
         <a href="/portal/">Dashboard</a>
         <form method="post" action="/portal/logout.php" class="inline"><?= csrf_field() ?><button class="link">Log out</button></form>
       <?php else: ?>

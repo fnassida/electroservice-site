@@ -119,3 +119,29 @@ CREATE TABLE IF NOT EXISTS messages (
     read_at DATETIME NULL,                   -- when the other participant first saw it
     created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Stage 6: texting.
+CREATE TABLE IF NOT EXISTS sms_prefs (
+    user_id INTEGER PRIMARY KEY,
+    phone VARCHAR(16) NOT NULL,          -- E.164, e.g. +18595551234. Never shown to other users.
+    opted_in_at DATETIME NULL,
+    opted_out_at DATETIME NULL,
+    verified_at DATETIME NULL,
+    verify_code VARCHAR(64) NULL,        -- hash of the 6-digit code
+    verify_sent_at DATETIME NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Every text in or out. Outbound rows also tell us which job thread a reply belongs to.
+CREATE TABLE IF NOT EXISTS sms_log (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    user_id INTEGER NULL,
+    direction VARCHAR(4) NOT NULL,       -- out | in
+    phone VARCHAR(16) NOT NULL,
+    work_order_id INTEGER NULL,
+    tech_id INTEGER NULL,
+    body TEXT NOT NULL,
+    twilio_sid VARCHAR(64) NULL,
+    status VARCHAR(24) NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
