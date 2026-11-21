@@ -32,6 +32,7 @@ page_start('Dashboard', $u);
       <div><h3>Get paid</h3><p>Connect a bank account through Stripe. Coming soon.</p></div>
     </li>
   </ol>
+  <?php if (!$ins['insured'] || $ins['expiring_soon']) echo insurance_offer_html('dashboard'); ?>
   <?php if ($profileDone && $ins['insured']): ?>
     <p><a class="btn primary" href="/portal/jobs/browse.php">Find work near you</a> <a class="btn plain" href="/portal/jobs/">Your jobs and offers</a></p>
   <?php endif; ?>

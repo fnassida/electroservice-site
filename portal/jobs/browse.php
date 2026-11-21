@@ -12,6 +12,7 @@ page_start('Find work', $u);
 <?php if (!$ready): ?>
   <p class="error">You can see jobs once your profile has a base address and your insurance is approved.
     <a href="/portal/">Finish setting up</a>.</p>
+  <?php if (!$ins['insured']) echo insurance_offer_html('find_work'); ?>
 <?php else:
     $mySkills = explode(',', $p['skills']);
     $rows = db()->prepare("SELECT w.*, u.company,

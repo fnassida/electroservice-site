@@ -65,6 +65,7 @@ page_start('Insurance', $u);
     </p>
   <?php endif; ?>
 
+  <?php if (!$ins['insured'] || $ins['expiring_soon']) echo insurance_offer_html('insurance_page'); ?>
   <h2 style="margin-top:2rem"><?= $doc ? 'Upload a new certificate' : 'Upload your certificate' ?></h2>
   <?php if ($errors): ?><div class="error" role="alert"><?php foreach ($errors as $er) echo '<div>' . e($er) . '</div>'; ?></div><?php endif; ?>
   <form method="post" enctype="multipart/form-data" class="stack">

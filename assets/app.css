@@ -131,3 +131,11 @@ details summary{cursor:pointer;color:var(--copper)}
 .chat-form{display:flex;gap:.6rem;align-items:flex-end;margin-top:.7rem}
 .chat-form textarea{flex:1;resize:vertical}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* insurance referral */
+.offer{display:flex;gap:1.5rem;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);
+  border-left:5px solid var(--w-blue);border-radius:6px;padding:1rem 1.2rem;margin:1.5rem 0;max-width:48rem}
+.offer h3{margin:0 0 .3rem}
+.offer p{margin:.2rem 0}
+.small{font-size:.88rem}
+@media (max-width:700px){.offer{flex-direction:column;align-items:flex-start}}

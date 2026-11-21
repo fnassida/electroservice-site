@@ -142,6 +142,31 @@ function too_many_attempts(string $email): bool {
     return (int)$st->fetchColumn() >= 8;
 }
 
+// ---------------------------------------------------------------- site settings (changed from admin, stored in the database)
+function setting(string $k, ?string $default = null): ?string {
+    $st = db()->prepare('SELECT v FROM settings WHERE k = ?');
+    $st->execute([$k]);
+    $v = $st->fetchColumn();
+    return $v === false || $v === null ? $default : (string)$v;
+}
+function set_setting(string $k, ?string $v): void {
+    db()->prepare('DELETE FROM settings WHERE k = ?')->execute([$k]);
+    if ($v !== null) db()->prepare('INSERT INTO settings (k, v) VALUES (?, ?)')->execute([$k, $v]);
+}
+
+// Insurance referral shown to techs without current insurance.
+const INSURANCE_DEFAULT_URL = 'https://www.hiscox.com/small-business-insurance';
+function insurance_offer_on(): bool { return setting('ins_aff_enabled', '1') === '1'; }
+function insurance_offer_html(string $context): string {
+    if (!insurance_offer_on()) return '';
+    $href = '/portal/go/insurance.php?from=' . rawurlencode($context);
+    return '<aside class="offer"><div><h3>Need liability insurance?</h3>'
+         . '<p>Hiscox sells general liability and professional liability for IT and tech businesses online, often in a few minutes. '
+         . 'Get a quote, then upload the certificate here.</p>'
+         . '<p class="muted small">Electro Service may earn a commission if you get a quote. That never affects whether your insurance is approved: any carrier is fine.</p></div>'
+         . '<a class="btn primary" href="' . e($href) . '" target="_blank" rel="sponsored noopener">Get a Hiscox quote</a></aside>';
+}
+
 // ---------------------------------------------------------------- techs
 const SKILLS = [
     'pc'        => 'Desktop and laptop repair',
