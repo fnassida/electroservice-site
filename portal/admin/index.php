@@ -27,7 +27,8 @@ page_start('Admin', $admin);
   <li><b><?= (int)($counts['provider'] ?? 0) ?></b> providers</li>
   <li><b><?= $pendingIns ?></b> insurance to review</li>
 </ul>
-<p><a class="btn <?= $pendingIns ? 'primary' : 'plain' ?>" href="/portal/admin/insurance.php">Review insurance</a></p>
+<p><a class="btn <?= $pendingIns ? 'primary' : 'plain' ?>" href="/portal/admin/insurance.php">Review insurance</a>
+  <a class="btn plain" href="/portal/admin/email.php">Email forwarding</a></p>
 
 <h2>Accounts</h2>
 <?php if (!$users): ?>

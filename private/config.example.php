@@ -13,6 +13,11 @@ return [
     'site_url'    => 'https://electroservice.net',
     'mail_from'   => 'info@electroservice.net',
 
+    // Hostinger API, used by Admin > Email forwarding. Create the token in hPanel (Account > API).
+    'hostinger_api_token' => '',
+    'mail_order_id'       => '',
+    'mail_mailbox_id'     => '',
+
     // Work board rules
     'platform_fee_rate' => 0.10,   // added on top of the job price, paid by the provider
     'min_job_amount'    => 50.00,
