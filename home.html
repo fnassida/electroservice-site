@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Electro Service | Start your own tech service business</title>
+<meta name="description" content="Practical lessons for computer and network technicians starting their own service business, from a consultant who has run one since 1994.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,500;112,800;125,900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#13253A;        /* deep slate blue: text, dark panels */
+    --paper:#F3F6F8;      /* cool off-white page */
+    --copper:#B5652B;     /* bare copper: links, primary action */
+    --line:#C9D3DB;       /* quiet rules */
+    /* T568B pair colours: the brand mark */
+    --w-orange:#E8792B; --w-green:#3E9A5A; --w-blue:#2D6CC0; --w-brown:#6B4A2E;
+    --measure:68ch;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:1.0625rem/1.6 "Atkinson Hyperlegible",system-ui,sans-serif}
+  a{color:var(--copper)}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--w-blue);outline-offset:3px;border-radius:2px}
+  .wrap{max-width:72rem;margin:0 auto;padding:0 1.5rem}
+  h1,h2,h3{font-family:Archivo,sans-serif;font-stretch:112%;line-height:1.05;margin:0}
+  h2{font-size:clamp(1.9rem,3.6vw,2.6rem);font-weight:800;margin-bottom:1.5rem}
+  h3{font-size:1.2rem;font-weight:800}
+  p{max-width:var(--measure)}
+  .todo{background:#FFE7A3;color:var(--ink);padding:0 .25em;border-radius:2px}
+
+  /* the wire stripe: eight conductors in T568B order */
+  .wires{display:flex;height:100%}
+  .wires i{flex:1}
+  .wires i:nth-child(1){background:repeating-linear-gradient(135deg,#fff 0 6px,var(--w-orange) 6px 12px)}
+  .wires i:nth-child(2){background:var(--w-orange)}
+  .wires i:nth-child(3){background:repeating-linear-gradient(135deg,#fff 0 6px,var(--w-green) 6px 12px)}
+  .wires i:nth-child(4){background:var(--w-blue)}
+  .wires i:nth-child(5){background:repeating-linear-gradient(135deg,#fff 0 6px,var(--w-blue) 6px 12px)}
+  .wires i:nth-child(6){background:var(--w-green)}
+  .wires i:nth-child(7){background:repeating-linear-gradient(135deg,#fff 0 6px,var(--w-brown) 6px 12px)}
+  .wires i:nth-child(8){background:var(--w-brown)}
+
+  /* header */
+  header{border-bottom:1px solid var(--line)}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-block:1rem}
+  .brand{display:flex;align-items:center;gap:.7rem;text-decoration:none;color:var(--ink);
+    font-family:Archivo,sans-serif;font-weight:900;font-stretch:125%;font-size:1.15rem;letter-spacing:-.01em}
+  .brand .wires{width:2.2rem;height:1.6rem;border-radius:3px;overflow:hidden}
+  nav{display:flex;gap:1.4rem;flex-wrap:wrap}
+  nav a{color:var(--ink);text-decoration:none;font-weight:700}
+  nav a:hover{color:var(--copper)}
+
+  /* hero: the cable runs down the left and splays into the headline */
+  .hero{position:relative;padding:clamp(3rem,8vw,6.5rem) 0 clamp(3rem,7vw,5rem)}
+  .hero .run{position:absolute;left:0;top:0;bottom:0;width:clamp(1.2rem,3.2vw,2.6rem)}
+  .hero .run .wires{flex-direction:row}
+  .hero .wrap{padding-left:clamp(2.8rem,6vw,4.5rem)}
+  .hero h1{font-size:clamp(2.6rem,7.2vw,5.6rem);font-weight:900;font-stretch:125%;letter-spacing:-.025em;max-width:14ch}
+  .hero p.lede{font-size:clamp(1.15rem,1.8vw,1.35rem);margin:1.6rem 0 2.2rem;max-width:46ch}
+  .actions{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}
+  .btn{display:inline-block;padding:.95rem 1.5rem;font-weight:700;text-decoration:none;border-radius:4px;font-size:1.05rem}
+  .btn.primary{background:var(--copper);color:#fff}
+  .btn.primary:hover{background:#9A5323}
+  .btn.plain{color:var(--ink);border:2px solid var(--ink)}
+  .btn.plain:hover{background:var(--ink);color:var(--paper)}
+  .hero .facts{display:flex;flex-wrap:wrap;gap:.5rem 2rem;margin-top:2.6rem;padding:0;list-style:none;font-weight:700}
+
+  section{padding:clamp(3rem,7vw,5.5rem) 0;border-top:1px solid var(--line)}
+
+  /* services: a plain two-column list, not cards */
+  .services{display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:2.2rem 3.5rem;margin:0;padding:0;list-style:none}
+  .services li{padding-left:1rem;border-left:4px solid var(--c,var(--w-blue))}
+  .services li:nth-child(4n+1){--c:var(--w-orange)}
+  .services li:nth-child(4n+2){--c:var(--w-green)}
+  .services li:nth-child(4n+3){--c:var(--w-blue)}
+  .services li:nth-child(4n+4){--c:var(--w-brown)}
+  .services p{margin:.45rem 0 0}
+
+  /* how a call goes: a real sequence */
+  .steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:2rem;margin:0;padding:0;list-style:none}
+  .steps li{counter-increment:s}
+  .steps li::before{content:counter(s);display:block;font-family:Archivo,sans-serif;font-weight:900;font-stretch:125%;
+    font-size:3rem;line-height:1;color:var(--copper);margin-bottom:.6rem}
+  .steps p{margin:.4rem 0 0}
+
+  .audience{margin:0;padding:0;list-style:none;display:grid;gap:1.1rem;max-width:var(--measure)}
+  .audience li{font-size:1.2rem;padding-left:1.4rem;position:relative}
+  .audience li::before{content:"";position:absolute;left:0;top:.55em;width:.6rem;height:.6rem;background:var(--copper);border-radius:1px}
+  .career{margin:1.6rem 0 0;padding:0;list-style:none;display:grid;gap:1.1rem}
+  .career li{display:grid;grid-template-columns:7.5rem 1fr;gap:1rem}
+  .career .yrs{font-weight:700;color:var(--copper)}
+  .career p{margin:.15rem 0 0}
+  @media (max-width:760px){.career li{grid-template-columns:1fr;gap:.1rem}}
+
+  /* about */
+  .about{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:3rem;align-items:start}
+  .about blockquote{margin:0;font-family:Archivo,sans-serif;font-weight:800;font-stretch:112%;font-size:clamp(1.5rem,2.6vw,2rem);line-height:1.2}
+
+  /* contact panel */
+  .contact{background:var(--ink);color:var(--paper);border-top:0;position:relative}
+  .contact .band{position:absolute;left:0;right:0;top:0;height:10px}
+  .contact h2{color:#fff}
+  .contact a{color:#F2A46B}
+  .contact dl{display:grid;grid-template-columns:max-content 1fr;gap:.9rem 2rem;margin:2rem 0 0;font-size:1.15rem}
+  .contact dt{font-weight:700;color:#9FB2C4}
+  .contact dd{margin:0}
+  .contact .btn.primary{margin-top:2.2rem}
+
+  footer{padding:1.6rem 0;font-size:.95rem;color:#51657A}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+
+  @media (max-width:760px){
+    nav{display:none}
+    .about{grid-template-columns:1fr}
+    .contact dl{grid-template-columns:1fr;gap:.2rem}
+    .contact dd{margin-bottom:.8rem}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Electro Service, home">
+      <span class="wires" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      Electro Service
+    </a>
+    <nav aria-label="Main">
+      <a href="#learn">What you'll learn</a>
+      <a href="#work">Find work</a>
+      <a href="#about">About Frank</a>
+      <a href="#join">Join the list</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <div class="run" aria-hidden="true"><span class="wires"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+    <div class="wrap">
+      <h1>From good tech to business owner.</h1>
+      <p class="lede">Practical lessons for computer and network technicians who want to start their own service business, from someone who has run one since 1994.</p>
+      <div class="actions">
+        <a class="btn primary" href="mailto:info@electroservice.net?subject=Notify%20me%20when%20lessons%20open">Get notified when lessons open</a>
+        <a class="btn plain" href="#learn">See what you'll learn</a>
+      </div>
+      <ul class="facts">
+        <li>Running Electro Service since 1994</li>
+        <li>40+ years in the computer industry</li>
+        <li>CompTIA A+, Dell DCSE, Berk-Tek certified</li>
+      </ul>
+    </div>
+  </div>
+
+  <section id="learn">
+    <div class="wrap">
+      <h2>What you'll learn</h2>
+      <ul class="services">
+        <li><h3>Setting up the business</h3><p>Choosing a structure, registering, insurance, a business bank account and the paperwork clients will ask for.</p></li>
+        <li><h3>Pricing your work</h3><p>Hourly, flat-rate and contract pricing, what techs in your market charge, and how not to undercharge.</p></li>
+        <li><h3>Finding work</h3><p>Field service marketplaces like WorkMarket and Field Nation, subcontracting for larger firms, and winning local clients of your own.</p></li>
+        <li><h3>Doing the job like a business</h3><p>Work orders, scheduling, documenting jobs and handling a client who isn't happy.</p></li>
+        <li><h3>Getting paid and keeping the books</h3><p>Invoicing, chasing late payments, bookkeeping, 1099s and setting money aside for taxes.</p></li>
+        <li><h3>Growing past yourself</h3><p>Repeat clients, service contracts, bringing on other techs and knowing when you're ready to.</p></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="who">
+    <div class="wrap">
+      <h2>Who it's for</h2>
+      <ul class="audience">
+        <li>Field techs taking marketplace jobs who want clients of their own.</li>
+        <li>IT staff thinking about going independent and wondering what it takes.</li>
+        <li>Techs with a side business who are ready to make it their main income.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="work" class="work">
+    <div class="wrap">
+      <h2>Find work orders here too</h2>
+      <p>The work board is opening soon. Providers post IT field service jobs and offer them to insured techs nearby; techs request work, chat with the provider and get paid through the site. Create your account now to be ready.</p>
+      <ul class="audience">
+        <li>A tech profile with your skills, certifications, insurance and coverage area.</li>
+        <li>Work orders with scope, location, schedule and pay stated up front.</li>
+        <li>Check-in, completion notes and payment handled in one place.</li>
+      </ul>
+      <div class="actions" style="margin-top:2rem">
+        <a class="btn primary" href="/portal/register.php?as=tech">Sign up as a tech</a>
+        <a class="btn plain" href="/portal/register.php?as=provider">Sign up as a provider</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="about">
+    <div class="wrap about">
+      <blockquote>“I've built and run a tech service business for over thirty years. These lessons are what I wish someone had told me at the start.”</blockquote>
+      <div>
+        <h2>About Frank B. Nassida</h2>
+        <p>Frank is a systems architect and technical consultant based in Kentucky, with more than 40 years in the computer industry and a degree in information technology from Strayer University, summa cum laude.</p>
+        <ul class="career">
+          <li><span class="yrs">1994–now</span><div><h3>Founder, Electro Service, Inc.</h3><p>Custom computer manufacturing in the thousands of units, nationwide deployment, and network architecture for multi-state contracts.</p></div></li>
+          <li><span class="yrs">1988–1994</span><div><h3>IBM Strategic Account Manager, Hamilton Avnet / Arrow Electronics</h3><p>Northeast liaison for IBM research facilities, including supercomputer sub-assembly contracts.</p></div></li>
+          <li><span class="yrs">1977–1982</span><div><h3>Franchise Group Manager, Tandy / Radio Shack</h3><p>Ran a 124-store franchise group across four states.</p></div></li>
+        </ul>
+        <p style="margin-top:1.4rem"><a href="https://nassida.com" target="_blank" rel="noopener">See Frank's full profile at nassida.com</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="join" class="contact">
+    <span class="band wires" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <div class="wrap">
+      <h2>Join the list</h2>
+      <p>The first lessons are being written now. Send an email and you'll hear when they open. <span class="todo">Tell me the format: free guides, a paid course, or coaching.</span></p>
+      <p>You can also say what you'd most like to learn, and it may become a lesson.</p>
+      <a class="btn primary" href="mailto:info@electroservice.net?subject=Notify%20me%20when%20lessons%20open">Get notified when lessons open</a>
+      <dl>
+        <dt>Email</dt><dd><a href="mailto:info@electroservice.net"><span class="todo">info@electroservice.net</span></a></dd>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Electro Service, Inc.</span>
+    <span><a href="/terms.html">Terms</a>&nbsp;&nbsp; <a href="/privacy.html">Privacy</a>&nbsp;&nbsp; <a href="/sms.html">Texting terms</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
