@@ -18,6 +18,10 @@ return [
     'mail_order_id'       => '',
     'mail_mailbox_id'     => '',
 
+    // Stripe. Use the test key (sk_test_...) until testing is done, then switch to the live key.
+    // Webhook secrets are created from Admin > Payments, so you don't need to copy them here.
+    'stripe_secret_key' => '',
+
     // Work board rules
     'platform_fee_rate' => 0.10,   // added on top of the job price, paid by the provider
     'min_job_amount'    => 50.00,

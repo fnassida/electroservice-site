@@ -28,6 +28,7 @@ page_start('Admin', $admin);
   <li><b><?= $pendingIns ?></b> insurance to review</li>
 </ul>
 <p><a class="btn <?= $pendingIns ? 'primary' : 'plain' ?>" href="/portal/admin/insurance.php">Review insurance</a>
+  <a class="btn plain" href="/portal/admin/payments.php">Payments</a>
   <a class="btn plain" href="/portal/admin/email.php">Email forwarding</a>
   <a class="btn plain" href="/portal/admin/texts.php">Texts</a>
   <a class="btn plain" href="/portal/admin/affiliates.php">Insurance referral</a></p>

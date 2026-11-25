@@ -9,6 +9,7 @@ if (!is_file($configFile)) {
 }
 $CONFIG = require $configFile;
 require __DIR__ . '/sms.php';
+require __DIR__ . '/stripe.php';
 
 // Blank values and leftover placeholders ("PASTE ...", "CHANGE ...") count as not set.
 function cfg(string $key, $default = null) {
@@ -435,8 +436,8 @@ function page_start(string $title, ?array $user = null): void {
     </a>
     <nav aria-label="Account">
       <?php if ($u): ?>
-        <?php if ($u['role'] === 'admin'): ?><a href="/portal/admin/">Admin</a><a href="/portal/admin/jobs.php">Jobs</a><a href="/portal/admin/messages.php">Messages</a><?php endif; ?>
-        <?php if ($u['role'] === 'tech'): ?><a href="/portal/jobs/browse.php">Find work</a><?php endif; ?>
+        <?php if ($u['role'] === 'admin'): ?><a href="/portal/admin/">Admin</a><a href="/portal/admin/jobs.php">Jobs</a><a href="/portal/admin/messages.php">Messages</a><a href="/portal/admin/payments.php">Payments</a><?php endif; ?>
+        <?php if ($u['role'] === 'tech'): ?><a href="/portal/jobs/browse.php">Find work</a><a href="/portal/payouts.php">Payouts</a><?php endif; ?>
         <?php if ($u['role'] !== 'admin'): $nUnread = unread_count((int)$u['id']); ?><a href="/portal/jobs/">My jobs<?= $nUnread ? ' <span class="tag provider">' . $nUnread . '</span>' : '' ?></a><?php endif; ?>
         <?php if ($u['role'] === 'provider'): ?><a href="/portal/jobs/new.php">Post a job</a><?php endif; ?>
         <?php if ($u['role'] !== 'admin'): ?><a href="/portal/settings.php">Settings</a><?php endif; ?>
@@ -473,6 +474,15 @@ function run_daily_jobs(bool $force = false): void {
     set_setting('daily_ran_on', $today);
     if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
     try { send_insurance_reminders(); } catch (Throwable $e) { error_log('insurance reminders: ' . $e->getMessage()); }
+    // Safety net in case a Stripe webhook was missed: recheck techs still waiting on payout setup.
+    try {
+        if (stripe_enabled()) {
+            $ids = db()->query("SELECT DISTINCT a.account_id FROM payments p JOIN work_orders w ON w.id = p.work_order_id
+                                JOIN stripe_accounts a ON a.user_id = w.tech_id WHERE p.status = 'paid' AND p.payout_status IN ('waiting','none') AND w.status = 'approved'")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($ids as $a) stripe_refresh_account($a);
+            stripe_release_waiting();
+        }
+    } catch (Throwable $e) { error_log('stripe payouts: ' . $e->getMessage()); }
 }
 
 function send_insurance_reminders(): int {

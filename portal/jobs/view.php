@@ -23,6 +23,9 @@ $canSee = $role === 'admin' || $isOwner || $isAssigned || $myPending
 if (!$canSee) not_found();
 
 $back = '/portal/jobs/view.php?id=' . (int)$w['id'];
+$payOn = stripe_enabled();
+$payment = job_payment((int)$w['id']);
+$paid = $payment && in_array($payment['status'], ['paid', 'disputed'], true);
 
 // ---------------------------------------------------------------- actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
@@ -47,15 +50,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
                 log_activity($uid, $a === 'withdraw_offer' ? 'offer_withdrawn' : 'request_declined', "#$woId tech " . $r['tech_id']);
                 flash($a === 'withdraw_offer' ? 'Offer withdrawn.' : 'Request declined.');
             }
+        } elseif ($a === 'pay' && $payOn && $w['status'] === 'assigned' && !$paid) {
+            $res = stripe_start_checkout($w, $u);
+            if (isset($res['url'])) redirect($res['url']);
+            flash($res['error']);
         } elseif ($a === 'cancel' && in_array($w['status'], ['open', 'assigned'], true)) {
+            $refundMsg = $paid ? stripe_refund($woId, 'Cancelled by provider', $uid) : null;
+            if ($paid && !str_starts_with($refundMsg, 'Refunded')) { flash('The job was not cancelled. ' . $refundMsg); redirect($back); }
             db()->prepare("UPDATE work_orders SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?")->execute([now(), now(), $woId]);
             db()->prepare("UPDATE wo_requests SET status = 'closed', decided_at = ? WHERE work_order_id = ? AND status = 'pending'")->execute([now(), $woId]);
             log_activity($uid, 'job_cancelled', "#$woId");
-            flash('Job cancelled.');
+            flash('Job cancelled.' . ($refundMsg ? ' ' . $refundMsg : ''));
         } elseif ($a === 'approve' && $w['status'] === 'submitted') {
             db()->prepare("UPDATE work_orders SET status = 'approved', approved_at = ?, updated_at = ? WHERE id = ?")->execute([now(), now(), $woId]);
             log_activity($uid, 'job_approved', "#$woId");
-            flash('Work approved.');
+            $payMsg = $paid ? ' ' . stripe_release_payout($woId) : '';
+            flash('Work approved.' . $payMsg);
         } elseif ($a === 'reopen_work' && $w['status'] === 'submitted') {
             db()->prepare("UPDATE work_orders SET status = 'in_progress', updated_at = ? WHERE id = ?")->execute([now(), $woId]);
             log_activity($uid, 'job_sent_back', "#$woId " . $note);
@@ -79,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
             log_activity($uid, 'offer_declined', "#$woId");
             flash('Offer declined.');
         } elseif ($a === 'check_in' && $isAssigned && $w['status'] === 'assigned') {
+            if ($payOn && !$paid) { flash('The provider hasn\'t paid for this job yet. You can check in once the payment is secured.'); redirect($back); }
             db()->prepare("UPDATE work_orders SET status = 'in_progress', checked_in_at = ?, updated_at = ? WHERE id = ?")->execute([now(), now(), $woId]);
             log_activity($uid, 'checked_in', "#$woId");
             flash('Checked in.');
@@ -158,6 +169,15 @@ page_start($w['title'], $u);
     <?php if ($w['min_coverage']): ?><dt>Insurance</dt><dd>At least $<?= number_format((int)$w['min_coverage']) ?> per occurrence</dd><?php endif; ?>
     <dt>Provider</dt><dd><?= e($w['company']) ?></dd>
     <?php if ($tech && ($isOwner || $role === 'admin')): ?><dt>Tech</dt><dd><?= e($tech['full_name']) ?></dd><?php endif; ?>
+    <?php if ($payOn && ($isOwner || $isAssigned || $role === 'admin') && $w['status'] !== 'open'): ?>
+      <dt>Payment</dt><dd><?php
+        if (!$payment || $payment['status'] === 'pending') echo 'Not paid yet';
+        elseif ($payment['status'] === 'paid') echo $payment['payout_status'] === 'sent' ? 'Paid out to the tech' : 'Paid, held until the work is approved';
+        elseif ($payment['status'] === 'refunded') echo 'Refunded to the provider';
+        elseif ($payment['status'] === 'disputed') echo 'Disputed by the provider\'s bank';
+        if ($payment && ($isOwner || $role === 'admin') && (int)$payment['tax_cents'] > 0) echo '<br><span class="muted">Includes ' . money((int)$payment['tax_cents']) . ' sales tax</span>';
+      ?></dd>
+    <?php endif; ?>
     <?php if ($w['checked_in_at']): ?><dt>Checked in</dt><dd><?= e(substr($w['checked_in_at'], 0, 16)) ?> UTC</dd><?php endif; ?>
   </dl>
 </div>
@@ -209,11 +229,16 @@ page_start($w['title'], $u);
       <button class="btn primary" name="action" value="approve">Approve work</button>
       <button class="btn plain" name="action" value="reopen_work">Send back to the tech</button>
     </form>
+  <?php elseif ($w['status'] === 'assigned' && $payOn && !$paid): ?>
+    <h2>Pay to confirm the booking</h2>
+    <p>Pay <?= money((int)$w['pay_cents'] + (int)$w['fee_cents']) ?><?= stripe_tax_on() ? ' plus any sales tax' : '' ?> by card or bank through Stripe.
+      Electro Service holds the money and releases <?= money((int)$w['pay_cents']) ?> to the tech only after you approve the work. Cancel before then and you get a full refund.</p>
+    <form method="post"><?= csrf_field() ?><button class="btn primary" name="action" value="pay">Pay <?= money((int)$w['pay_cents'] + (int)$w['fee_cents']) ?></button></form>
   <?php elseif (in_array($w['status'], ['assigned', 'in_progress'], true)): ?>
-    <p><?= $w['status'] === 'assigned' ? 'Booked. Waiting for the tech to check in on site.' : 'The tech is on site and working.' ?></p>
+    <p><?= $w['status'] === 'assigned' ? ($payOn ? 'Booked and paid.' : 'Booked.') . ' Waiting for the tech to check in on site.' : 'The tech is on site and working.' ?></p>
   <?php endif; ?>
   <?php if (in_array($w['status'], ['open', 'assigned'], true)): ?>
-    <form method="post" style="margin-top:1.5rem" onsubmit="return confirm('Cancel this job?')"><?= csrf_field() ?>
+    <form method="post" style="margin-top:1.5rem" onsubmit="return confirm('<?= $paid ? 'Cancel this job and refund your payment?' : 'Cancel this job?' ?>')"><?= csrf_field() ?>
       <button class="link" name="action" value="cancel">Cancel this job</button></form>
   <?php endif; ?>
 
@@ -233,9 +258,13 @@ page_start($w['title'], $u);
       <label>Note to the provider <span class="hint">Optional. Relevant experience, availability.</span><textarea name="note" rows="3" maxlength="500"></textarea></label>
       <div><button class="btn primary" name="action" value="request">Request job</button></div>
     </form>
+  <?php elseif ($isAssigned && $w['status'] === 'assigned' && $payOn && !$paid): ?>
+    <h2>You're booked</h2>
+    <p>Waiting for the provider to pay. You'll get an email when the payment is secured, and then you can check in.</p>
+    <?php if (!tech_can_be_paid($uid)): ?><p><a href="/portal/payouts.php">Set up payouts</a> so you can be paid when the work is approved.</p><?php endif; ?>
   <?php elseif ($isAssigned && $w['status'] === 'assigned'): ?>
     <h2>You're booked</h2>
-    <p>Check in when you arrive on site.</p>
+    <p><?= $payOn ? 'Payment is secured. ' : '' ?>Check in when you arrive on site.</p>
     <form method="post"><?= csrf_field() ?><button class="btn primary" name="action" value="check_in">Check in</button></form>
   <?php elseif ($isAssigned && $w['status'] === 'in_progress'): ?>
     <h2>Mark the job complete</h2>
@@ -247,7 +276,10 @@ page_start($w['title'], $u);
   <?php elseif ($isAssigned && $w['status'] === 'submitted'): ?>
     <p>Submitted. Waiting for the provider to approve.</p>
   <?php elseif ($isAssigned && $w['status'] === 'approved'): ?>
-    <p>Approved. Thank you.</p>
+    <p>Approved. Thank you.<?php if ($payOn && $payment && $payment['status'] === 'paid'):
+        echo $payment['payout_status'] === 'sent' ? ' ' . money((int)$payment['amount_cents']) . ' has been sent to your Stripe account.'
+           : ' Your ' . money((int)$payment['amount_cents']) . ' is waiting. <a href="/portal/payouts.php">Finish payout setup</a> to receive it.';
+      endif; ?></p>
   <?php endif; ?>
 <?php endif; ?>
 </section>

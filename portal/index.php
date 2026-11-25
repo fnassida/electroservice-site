@@ -28,8 +28,11 @@ page_start('Dashboard', $u);
       <div><h3>Insurance</h3><p><?= e($insText) ?></p></div>
       <a class="btn <?= $insOk || ($doc && $doc['status'] === 'pending') ? 'plain' : 'primary' ?>" href="/portal/insurance.php"><?= $doc ? 'View insurance' : 'Upload certificate' ?></a>
     </li>
-    <li>
-      <div><h3>Get paid</h3><p>Connect a bank account through Stripe. Coming soon.</p></div>
+    <?php $canPay = tech_can_be_paid((int)$u['id']); ?>
+    <li class="<?= $canPay ? 'done' : '' ?>">
+      <div><h3>Get paid</h3><p><?= $canPay ? 'Payouts set up. Approved jobs are paid to your bank through Stripe.'
+          : (stripe_enabled() ? 'Connect your bank through Stripe so you can be paid when providers approve your work.' : 'Bank payouts through Stripe are coming soon.') ?></p></div>
+      <?php if (stripe_enabled()): ?><a class="btn <?= $canPay ? 'plain' : 'primary' ?>" href="/portal/payouts.php"><?= $canPay ? 'View payouts' : 'Set up payouts' ?></a><?php endif; ?>
     </li>
   </ol>
   <?php if (!$ins['insured'] || $ins['expiring_soon']) echo insurance_offer_html('dashboard'); ?>

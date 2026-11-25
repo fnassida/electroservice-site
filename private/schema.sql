@@ -170,3 +170,41 @@ CREATE TABLE IF NOT EXISTS reminders_sent (
     kind VARCHAR(32) NOT NULL,           -- e.g. ins_30, ins_7, ins_expired
     created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Stage 5: Stripe payments. One row per Checkout attempt, and the latest non-expired row is the job payment.
+CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    work_order_id INTEGER NOT NULL,
+    provider_id INTEGER NOT NULL,
+    tech_id INTEGER NULL,
+    checkout_session_id VARCHAR(255) NOT NULL,
+    payment_intent_id VARCHAR(255) NULL,
+    charge_id VARCHAR(255) NULL,
+    amount_cents INTEGER NOT NULL,        -- job price, goes to the tech
+    fee_cents INTEGER NOT NULL,           -- platform fee
+    tax_cents INTEGER NOT NULL DEFAULT 0, -- sales tax collected by Stripe Tax
+    total_cents INTEGER NOT NULL,         -- what the provider was charged
+    status VARCHAR(16) NOT NULL,          -- pending | paid | refunded | disputed | expired
+    payout_status VARCHAR(16) NOT NULL DEFAULT 'none',  -- none | waiting | sent | failed
+    transfer_id VARCHAR(255) NULL,
+    paid_at DATETIME NULL,
+    transferred_at DATETIME NULL,
+    refunded_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS stripe_accounts (
+    user_id INTEGER PRIMARY KEY,
+    account_id VARCHAR(255) NOT NULL,
+    transfers_active TINYINT NOT NULL DEFAULT 0,
+    payouts_enabled TINYINT NOT NULL DEFAULT 0,
+    details_submitted TINYINT NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS stripe_events (
+    id VARCHAR(255) PRIMARY KEY,
+    type VARCHAR(80) NOT NULL,
+    received_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
