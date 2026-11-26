@@ -430,7 +430,7 @@ function page_start(string $title, ?array $user = null): void {
 <body>
 <header class="bar">
   <div class="wrap">
-    <a class="brand" href="/"><img src="/assets/logo.svg" width="182" height="47" alt="Electro Service"></a>
+    <a class="brand" href="/"><img src="/assets/logo-es.svg" width="182" height="47" alt="Electro Service"></a>
     <nav aria-label="Account">
       <?php if ($u): ?>
         <?php if ($u['role'] === 'admin'): ?><a href="/portal/admin/">Admin</a><a href="/portal/admin/jobs.php">Jobs</a><a href="/portal/admin/messages.php">Messages</a><a href="/portal/admin/payments.php">Payments</a><?php endif; ?>
