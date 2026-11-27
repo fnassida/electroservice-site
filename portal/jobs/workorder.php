@@ -29,7 +29,7 @@ class WorkOrderPdf extends FPDF {
         $this->SetY(-14);
         $this->SetFont('Helvetica', '', 8);
         $this->SetTextColor(110);
-        $this->Cell(0, 5, t('Work order ' . $this->num . '   |   electroservice.net   |   Page ' . $this->PageNo() . ' of {nb}'), 0, 0, 'C');
+        $this->Cell(0, 5, t('Work order ' . $this->num . '   |   Confidential: for this job only   |   electroservice.net   |   Page ' . $this->PageNo() . ' of {nb}'), 0, 0, 'C');
     }
 }
 

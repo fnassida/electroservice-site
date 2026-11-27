@@ -359,3 +359,40 @@ function job_as_form(array $wo): array {
         'instructions' => (string)job_instructions((int)$wo['id']),
     ];
 }
+
+// Pin on Google Maps for a shared GPS location (shown to the provider and admin only).
+function gps_map_url(array $loc): string {
+    return 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode(round((float)$loc['lat'], 6) . ',' . round((float)$loc['lng'], 6));
+}
+function gps_detail_html(?array $loc): string {
+    if (!$loc) return '<span class="muted">Location not shared</span>';
+    return '<span class="muted">' . e(job_location_text($loc)) . '</span><br><span class="muted">' . e(number_format((float)$loc['lat'], 5) . ', ' . number_format((float)$loc['lng'], 5))
+        . ' at ' . e(local_time($loc['created_at'])) . ' ET</span> <a href="' . e(gps_map_url($loc)) . '" target="_blank" rel="noopener">View on map</a>';
+}
+
+// ---------------------------------------------------------------- tech voice contact
+function tech_contact(int $userId): ?array {
+    $st = db()->prepare('SELECT * FROM tech_contact WHERE user_id = ?');
+    $st->execute([$userId]);
+    return $st->fetch() ?: null;
+}
+
+// The tech's number for a provider to call, or null if hidden. Only while the job is booked and active.
+function tech_phone_for_job(array $wo, array $viewer): ?string {
+    if (!$wo['tech_id'] || !in_array($wo['status'], ['assigned', 'in_progress', 'submitted'], true)) return null;
+    if (!($viewer['role'] === 'admin' || (int)$wo['provider_id'] === (int)$viewer['id'])) return null;
+    $c = tech_contact((int)$wo['tech_id']);
+    return $c && (int)$c['show_to_providers'] === 1 ? $c['phone'] : null;
+}
+
+function phone_display(string $e164): string {
+    $d = preg_replace('/\D/', '', $e164);
+    if (strlen($d) === 11 && $d[0] === '1') $d = substr($d, 1);
+    return strlen($d) === 10 ? sprintf('(%s) %s-%s', substr($d, 0, 3), substr($d, 3, 3), substr($d, 6)) : $e164;
+}
+
+function phone_call_html(string $e164): string {
+    return '<a class="btn plain" href="tel:' . e($e164) . '">Call ' . e(phone_display($e164)) . '</a>';
+}
+
+const CONFIDENTIAL_NOTE = 'Confidential. Use this contact information only for this job. Hiring this tech outside Electro Service is against our Terms.';

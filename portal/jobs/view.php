@@ -295,7 +295,13 @@ page_start($w['title'], $u);
     <dt>Skills</dt><dd><?= e(skill_labels($w['skills'])) ?></dd>
     <?php if ($w['min_coverage']): ?><dt>Insurance</dt><dd>At least $<?= number_format((int)$w['min_coverage']) ?> per occurrence</dd><?php endif; ?>
     <dt>Provider</dt><dd><?= e($w['company']) ?></dd>
-    <?php if ($tech && ($isOwner || $role === 'admin')): ?><dt>Tech</dt><dd><?= avatar_html((int)$w['tech_id'], $tech['full_name']) ?><?= e($tech['full_name']) ?></dd><?php endif; ?>
+    <?php if ($tech && ($isOwner || $role === 'admin')): ?><dt>Tech</dt><dd><?= avatar_html((int)$w['tech_id'], $tech['full_name'], 'avatar lg') ?><strong><?= e($tech['full_name']) ?></strong>
+      <?php $ph = tech_phone_for_job($w, $u); ?>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem"><?= $ph ? phone_call_html($ph) : '' ?>
+        <?php if ($threads): ?><a class="btn plain" href="#chat">Message the tech</a><?php endif; ?></div>
+      <?php if ($ph): ?><span class="hint"><?= e(CONFIDENTIAL_NOTE) ?> <a href="/terms.html">Terms</a></span><?php endif; ?>
+      <?php if (!$ph && in_array($w['status'], ['assigned', 'in_progress', 'submitted'], true)): ?><span class="hint">This tech hasn't shared a phone number. Use the messages below.</span><?php endif; ?>
+      <?php if ($threads && sms_enabled()): ?><span class="hint">Messages also reach the tech by text if they've turned texts on.</span><?php endif; ?></dd><?php endif; ?>
     <?php if ($payOn && ($isOwner || $isAssigned || $role === 'admin') && $w['status'] !== 'open'): ?>
       <dt>Payment</dt><dd><?php
         if (!$payment || $payment['status'] === 'pending') echo 'Not paid yet';
@@ -305,10 +311,11 @@ page_start($w['title'], $u);
         if ($payment && ($isOwner || $role === 'admin') && (int)$payment['tax_cents'] > 0) echo '<br><span class="muted">Includes ' . money((int)$payment['tax_cents']) . ' sales tax</span>';
       ?></dd>
     <?php endif; ?>
-    <?php if ($w['checked_in_at']): ?><dt>Checked in</dt><dd><?= e(substr($w['checked_in_at'], 0, 16)) ?> UTC
-      <?php if ($seeProof): ?><br><span class="muted"><?= e(job_location_text(job_location((int)$w['id'], 'check_in'))) ?></span><?php endif; ?></dd><?php endif; ?>
-    <?php if ($w['submitted_at']): ?><dt>Completed</dt><dd><?= e(substr($w['submitted_at'], 0, 16)) ?> UTC
-      <?php if ($seeProof): ?><br><span class="muted"><?= e(job_location_text(job_location((int)$w['id'], 'submit'))) ?></span><?php endif; ?></dd><?php endif; ?>
+    <?php $gpsFull = $isOwner || $role === 'admin'; ?>
+    <?php if ($w['checked_in_at']): ?><dt>Checked in</dt><dd><?= e(local_time($w['checked_in_at'])) ?> ET<?= $w['status'] === 'in_progress' ? ' <span class="tag ok">On site</span>' : '' ?>
+      <?php if ($seeProof): ?><br><?= $gpsFull ? gps_detail_html(job_location((int)$w['id'], 'check_in')) : '<span class="muted">' . e(job_location_text(job_location((int)$w['id'], 'check_in'))) . '</span>' ?><?php endif; ?></dd><?php endif; ?>
+    <?php if ($w['submitted_at']): ?><dt>Completed</dt><dd><?= e(local_time($w['submitted_at'])) ?> ET
+      <?php if ($seeProof): ?><br><?= $gpsFull ? gps_detail_html(job_location((int)$w['id'], 'submit')) : '<span class="muted">' . e(job_location_text(job_location((int)$w['id'], 'submit'))) . '</span>' ?><?php endif; ?></dd><?php endif; ?>
   </dl>
 </div>
 

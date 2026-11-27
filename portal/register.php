@@ -66,7 +66,7 @@ page_start('Sign up');
     <label>Password <span class="hint">At least 10 characters.</span>
       <input type="password" name="password" autocomplete="new-password" required minlength="10"></label>
     <label class="check"><input type="checkbox" name="terms" value="1">
-      <span>I agree to the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>.</span></label>
+      <span>I agree to the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>, including keeping other users' information confidential and booking all work with people I meet here through Electro Service.</span></label>
     <div><button class="btn primary">Create account</button></div>
   </form>
 </div>

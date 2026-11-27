@@ -428,6 +428,17 @@ function unread_count(int $userId, ?int $woId = null): int {
     return (int)$st->fetchColumn();
 }
 
+// Shows a stored UTC time in the site's display time zone (Eastern by default), e.g. "Nov 27, 5:31 pm".
+function local_time(?string $utc, string $fmt = 'M j, g:i a'): string {
+    if (!$utc) return '';
+    $d = new DateTime($utc, new DateTimeZone('UTC'));
+    $d->setTimezone(new DateTimeZone((string)cfg('display_timezone', 'America/New_York')));
+    return $d->format($fmt);
+}
+function local_now(): string {
+    return (new DateTime('now', new DateTimeZone((string)cfg('display_timezone', 'America/New_York'))))->format('Y-m-d H:i:s');
+}
+
 function fmt_start(string $dt): string {
     $t = strtotime($dt);
     return date('D M j, Y', $t) . ' at ' . date('g:i a', $t);

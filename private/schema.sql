@@ -287,3 +287,12 @@ CREATE TABLE IF NOT EXISTS job_templates (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Tech's phone for voice calls from providers. Shown only on jobs the tech is booked for, and only if they agree.
+CREATE TABLE IF NOT EXISTS tech_contact (
+    user_id INTEGER PRIMARY KEY,
+    phone VARCHAR(20) NOT NULL,
+    show_to_providers TINYINT NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

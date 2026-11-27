@@ -42,6 +42,11 @@ page_start('Dashboard', $u);
       <div><h3>Insurance</h3><p><?= e($insText) ?></p></div>
       <a class="btn <?= $insOk || ($doc && $doc['status'] === 'pending') ? 'plain' : 'primary' ?>" href="/portal/insurance.php"><?= $doc ? 'View insurance' : 'Upload certificate' ?></a>
     </li>
+    <?php $tc = tech_contact((int)$u['id']); ?>
+    <li class="<?= $tc ? 'done' : '' ?>">
+      <div><h3>Phone for calls <span class="muted" style="font-weight:400">(optional)</span></h3><p><?= $tc ? ((int)$tc['show_to_providers'] ? 'Providers can call you at ' . e(phone_display($tc['phone'])) . ' on jobs you\'re booked for.' : 'Saved, but hidden from providers.') : 'Let providers call you about jobs you\'re booked for. Shown only to that job\'s provider.' ?></p></div>
+      <a class="btn plain" href="/portal/contact.php"><?= $tc ? 'Change' : 'Add phone' ?></a>
+    </li>
     <?php $canPay = tech_can_be_paid((int)$u['id']); ?>
     <li class="<?= $canPay ? 'done' : '' ?>">
       <div><h3>Get paid</h3><p><?= $canPay ? 'Payouts set up. Approved jobs are paid to your bank through Stripe.'
