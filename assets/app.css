@@ -183,3 +183,11 @@ img.avatar.sm{width:2rem;height:2rem}
 .legend .key{display:inline-block;width:1rem;height:1rem;border:1px solid var(--line);border-radius:2px;margin-right:.3rem;vertical-align:-2px}
 .legend .key.row-onsite{background:#DFF3E4}.legend .key.row-late{background:#FDE7E4}.legend .key.row-review{background:#FFF4D6}.legend .key.row-open{background:#F3F6F8}
 .stats .st-onsite b{color:#1E5631}.stats .st-late b{color:var(--bad)}
+/* Remote support */
+.remote-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem}
+.remote-grid > div{background:#fff;border:1px solid var(--line);border-radius:6px;padding:.9rem 1rem}
+.remote-grid h3{margin:0 0 .4rem;font-size:1rem}
+dl.remote{display:grid;grid-template-columns:auto 1fr;gap:.3rem .8rem;margin:0}
+dl.remote dt{color:var(--muted)}
+dl.remote dd{margin:0}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:1.1rem;letter-spacing:.04em}

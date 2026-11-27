@@ -65,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
             db()->prepare("UPDATE work_orders SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?")->execute([now(), now(), $woId]);
             db()->prepare("UPDATE wo_requests SET status = 'closed', decided_at = ? WHERE work_order_id = ? AND status = 'pending'")->execute([now(), $woId]);
             log_activity($uid, 'job_cancelled', "#$woId");
+            clear_job_remote($woId);
             flash('Job cancelled.' . ($refundMsg ? ' ' . $refundMsg : ''));
         } elseif ($a === 'add_photo_request' && $canEditRequests) {
             $added = 0;
@@ -73,6 +74,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
                 add_photo_request($woId, $l); $added++;
             }
             if ($added) { log_activity($uid, 'photo_requested', "#$woId"); flash($added === 1 ? 'Photo added to the list.' : "$added photos added to the list."); }
+        } elseif ($a === 'save_remote' && remote_active($w)) {
+            $err = save_job_remote($w, 'provider');
+            if ($err) { flash($err); redirect($back . '#remote'); }
+            log_activity($uid, 'remote_saved', "#$woId provider");
+            if (empty($_POST['clear']) && $w['tech_id']) {
+                $t = db()->prepare('SELECT email FROM users WHERE id = ?'); $t->execute([(int)$w['tech_id']]);
+                send_mail((string)$t->fetchColumn(), "Remote session details for job #$woId", "{$w['company']} added remote session details for \"{$w['title']}\". Open the job page to see them:\n" . site_link($back . '#remote'));
+            }
+            flash(empty($_POST['clear']) ? 'Remote session details saved. The tech has been emailed.' : 'Remote session details removed.');
+            redirect($back . '#remote');
         } elseif ($a === 'save_instructions' && $canEditRequests) {
             save_job_instructions($woId, (string)($_POST['instructions'] ?? ''));
             log_activity($uid, 'instructions_saved', "#$woId");
@@ -86,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
         } elseif ($a === 'approve' && $w['status'] === 'submitted') {
             db()->prepare("UPDATE work_orders SET status = 'approved', approved_at = ?, updated_at = ? WHERE id = ?")->execute([now(), now(), $woId]);
             log_activity($uid, 'job_approved', "#$woId");
+            clear_job_remote($woId);
             $payMsg = $paid ? ' ' . stripe_release_payout($woId) : '';
             flash('Work approved.' . $payMsg);
         } elseif ($a === 'reopen_work' && $w['status'] === 'submitted') {
@@ -116,6 +128,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
             log_activity($uid, 'checked_in', "#$woId");
             $loc = record_job_location($w, $uid, 'check_in');
             flash('Checked in.' . ($loc ? ' Your location was shared with the provider.' : ''));
+        } elseif ($a === 'save_remote' && $isAssigned && remote_active($w)) {
+            $err = save_job_remote($w, 'tech');
+            if ($err) { flash($err); redirect($back . '#remote'); }
+            log_activity($uid, 'remote_saved', "#$woId tech");
+            if (empty($_POST['clear'])) {
+                $p = db()->prepare('SELECT email FROM users WHERE id = ?'); $p->execute([(int)$w['provider_id']]);
+                send_mail((string)$p->fetchColumn(), "Tech's remote ID for job #$woId", "{$u['full_name']} posted their laptop's remote access ID for \"{$w['title']}\". Open the job page to see it:\n" . site_link($back . '#remote'));
+            }
+            flash(empty($_POST['clear']) ? 'Remote ID saved. The provider has been emailed.' : 'Remote ID removed.');
+            redirect($back . '#remote');
         } elseif ($a === 'upload' && $canUpload) {
             $kind = ($_POST['kind'] ?? '') === 'signoff' ? 'signoff' : 'photo';
             $rid = (int)($_POST['request_id'] ?? 0);
@@ -211,6 +233,45 @@ page_start($w['title'], $u);
       <?php else: ?>
         <div class="prose"><?= nl2br(e($instr)) ?></div>
       <?php endif; ?>
+      </section>
+    <?php endif; ?>
+    <?php if ($seeProof && remote_active($w)): $rem = job_remote((int)$w['id']);
+      $remForm = function (string $side, ?array $r) use ($w): string {
+          $opts = '';
+          foreach (REMOTE_TOOLS as $t) $opts .= '<option' . ($r && $r['tool'] === $t ? ' selected' : '') . '>' . e($t) . '</option>';
+          $isTech = $side === 'tech';
+          return '<form method="post" class="stack remote-form">' . csrf_field()
+              . '<div class="addr"><label>Tool <select name="tool">' . $opts . '</select></label>'
+              . ($isTech ? '' : '<label class="wide" style="grid-column:auto / span 2">Session link <span class="hint">Optional. Starts with https://</span><input type="url" name="link" maxlength="500" value="' . e($r['link'] ?? '') . '" placeholder="https://"></label>')
+              . '</div>'
+              . '<label>' . ($isTech ? 'Your remote ID' : 'Session code or ID') . ' <span class="hint">' . ($isTech ? 'The ID the remote tool shows on your laptop, e.g. 123 456 789. Never share your password here; give it by phone when they connect.' : 'Optional if you gave a link.') . '</span>'
+              . '<input type="text" name="code" maxlength="80" value="' . e($r['code'] ?? '') . '" autocomplete="off"></label>'
+              . '<label>Note <span class="hint">Optional, e.g. "NOC will connect at 9:15 once the laptop is on the router\'s LAN port."</span><input type="text" name="note" maxlength="500" value="' . e($r['note'] ?? '') . '"></label>'
+              . '<input type="hidden" name="action" value="save_remote">'
+              . '<div style="display:flex;gap:.6rem;flex-wrap:wrap"><button class="btn plain">Save</button>'
+              . ($r ? '<button class="link" name="clear" value="1" formnovalidate>Remove</button>' : '')
+              . '</div></form>';
+      };
+      $remShow = function (?array $r, string $who): string {
+          if (!$r) return '<p class="muted">Nothing yet.</p>';
+          $h = '<dl class="remote"><dt>Tool</dt><dd>' . e($r['tool']) . '</dd>';
+          if ($r['link']) $h .= '<dt>Link</dt><dd><a class="btn primary" href="' . e($r['link']) . '" target="_blank" rel="noopener noreferrer">Join the session</a></dd>';
+          if ($r['code']) $h .= '<dt>' . ($who === 'tech' ? 'Remote ID' : 'Code') . '</dt><dd><strong class="mono">' . e($r['code']) . '</strong></dd>';
+          if ($r['note']) $h .= '<dt>Note</dt><dd>' . e($r['note']) . '</dd>';
+          return $h . '<dt>Updated</dt><dd>' . e(local_time($r['updated_at'])) . ' ET</dd></dl>';
+      };
+    ?>
+      <section id="remote" class="remote-wrap">
+        <h2 style="margin-top:1.6rem">Remote support</h2>
+        <p class="hint">For work done remotely while the tech is on site, such as configuring the router through the tech's laptop. Only the booked tech and this provider can see this, and it's removed when the job is approved or cancelled. Close the session when the work is done.</p>
+        <div class="remote-grid">
+          <div><h3>From the provider</h3>
+            <?php if ($isOwner): ?><p class="hint">A session link or code for the tech to join, e.g. a Teams or Zoom meeting, or a ScreenConnect support session.</p><?= $remForm('provider', $rem['provider'] ?? null) ?>
+            <?php else: ?><?= $remShow($rem['provider'] ?? null, 'provider') ?><?php endif; ?></div>
+          <div><h3>Tech's laptop</h3>
+            <?php if ($isAssigned): ?><p class="hint">If the provider's team will connect to your laptop to reach the router, install the tool they ask for and post its ID here.</p><?= $remForm('tech', $rem['tech'] ?? null) ?>
+            <?php else: ?><?= $remShow($rem['tech'] ?? null, 'tech') ?><?php endif; ?></div>
+        </div>
       </section>
     <?php endif; ?>
     <?php if ($seeProof && $w['status'] !== 'cancelled'): ?>

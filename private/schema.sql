@@ -296,3 +296,16 @@ CREATE TABLE IF NOT EXISTS tech_contact (
     show_to_providers TINYINT NOT NULL DEFAULT 0,
     updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Remote support details for a booked job: the buyer's session link or code, and the tech's laptop remote ID.
+CREATE TABLE IF NOT EXISTS job_remote (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    work_order_id INTEGER NOT NULL,
+    side VARCHAR(10) NOT NULL,            -- provider | tech
+    tool VARCHAR(40) NOT NULL,
+    link VARCHAR(500) NULL,
+    code VARCHAR(80) NULL,
+    note VARCHAR(500) NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

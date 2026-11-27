@@ -396,3 +396,40 @@ function phone_call_html(string $e164): string {
 }
 
 const CONFIDENTIAL_NOTE = 'Confidential. Use this contact information only for this job. Hiring this tech outside Electro Service is against our Terms.';
+
+// ---------------------------------------------------------------- remote support
+const REMOTE_TOOLS = ['AnyDesk', 'TeamViewer', 'ScreenConnect', 'Splashtop', 'RustDesk', 'Microsoft Teams', 'Zoom', 'Google Meet', 'Other'];
+
+function remote_active(array $wo): bool { return in_array($wo['status'], ['assigned', 'in_progress'], true); }
+
+function job_remote(int $woId): array {
+    $st = db()->prepare('SELECT * FROM job_remote WHERE work_order_id = ?');
+    $st->execute([$woId]);
+    $out = [];
+    foreach ($st->fetchAll() as $r) $out[$r['side']] = $r;
+    return $out;
+}
+
+// Saves one side's remote details from the form. Returns an error message or null.
+function save_job_remote(array $wo, string $side): ?string {
+    $tool = in_array($_POST['tool'] ?? '', REMOTE_TOOLS, true) ? $_POST['tool'] : null;
+    $link = trim((string)($_POST['link'] ?? ''));
+    $code = mb_substr(trim((string)($_POST['code'] ?? '')), 0, 80);
+    $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 500);
+    if (!empty($_POST['clear'])) {
+        db()->prepare('DELETE FROM job_remote WHERE work_order_id = ? AND side = ?')->execute([(int)$wo['id'], $side]);
+        return null;
+    }
+    if (!$tool) return 'Choose which remote tool you use.';
+    if ($link !== '' && (!filter_var($link, FILTER_VALIDATE_URL) || !str_starts_with(strtolower($link), 'https://') || strlen($link) > 500)) return 'The session link must be a full web address starting with https://';
+    if ($link === '' && $code === '') return $side === 'tech' ? 'Enter your remote ID.' : 'Add a session link or a session code.';
+    db()->prepare('DELETE FROM job_remote WHERE work_order_id = ? AND side = ?')->execute([(int)$wo['id'], $side]);
+    db()->prepare('INSERT INTO job_remote (work_order_id, side, tool, link, code, note, updated_at) VALUES (?,?,?,?,?,?,?)')
+        ->execute([(int)$wo['id'], $side, $tool, $link ?: null, $code ?: null, $note ?: null, now()]);
+    return null;
+}
+
+// Remote details are only for the job while it's under way.
+function clear_job_remote(int $woId): void {
+    db()->prepare('DELETE FROM job_remote WHERE work_order_id = ?')->execute([$woId]);
+}
