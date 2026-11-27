@@ -484,6 +484,7 @@ const ONSITE_STANDARDS = [
     'No smoking or vaping inside the customer\'s building.',
     'No alcohol or drugs: don\'t drink or use drugs before or during a job, and don\'t have alcohol or illegal drugs in your vehicle or on the customer\'s site.',
     'Never bring a firearm or any other weapon onto customer premises.',
+    'Follow all of the customer\'s safety rules while on site, including any required safety gear, sign-in, escorts and restricted areas.',
 ];
 
 function onsite_standards_html(): string {
