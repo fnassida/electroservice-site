@@ -27,7 +27,7 @@ class WorkOrderPdf extends FPDF {
     public string $num = '';
     function Footer(): void {
         $this->SetY(-14);
-        $this->SetFont('Helvetica', '', 8);
+        $this->SetFont('Helvetica', '', 7);
         $this->SetTextColor(110);
         $this->Cell(0, 5, t('Work order ' . $this->num . '   |   Confidential: for this job only   |   electroservice.net   |   Page ' . $this->PageNo() . ' of {nb}'), 0, 0, 'C');
     }
@@ -78,11 +78,11 @@ $pdf->Ln(5);
 // Facts in two columns
 function fact(FPDF $pdf, float $x, float $w, string $label, string $value): float {
     $pdf->SetX($x);
-    $pdf->SetFont('Helvetica', 'B', 8); $pdf->SetTextColor(110);
-    $pdf->Cell($w, 4.5, t(strtoupper($label)), 0, 2);
+    $pdf->SetFont('Helvetica', 'B', 7); $pdf->SetTextColor(110);
+    $pdf->Cell($w, 4, t(strtoupper($label)), 0, 2);
     $pdf->SetX($x);
-    $pdf->SetFont('Helvetica', '', 10.5); $pdf->SetTextColor(20);
-    $pdf->MultiCell($w, 5, t($value));
+    $pdf->SetFont('Helvetica', '', 9.5); $pdf->SetTextColor(20);
+    $pdf->MultiCell($w, 4.4, t($value));
     return $pdf->GetY() + 2.5;
 }
 $colW = ($W - 8) / 2; $x1 = 16; $x2 = 16 + $colW + 8;
@@ -90,7 +90,7 @@ $top = $pdf->GetY();
 $start = strtotime($w['start_at']);
 $y1 = fact($pdf, $x1, $colW, 'Provider contact', $w['provider_name'] . ', ' . $w['company']);
 $pdf->SetY($y1); $y1 = fact($pdf, $x1, $colW, 'Job site', $w['street'] . "\n" . $w['city'] . ', ' . $w['state'] . ' ' . $w['zip']);
-$pdf->SetXY($x1, $y1 - 2); $pdf->SetFont('Helvetica', 'U', 9); $pdf->SetTextColor(...$red);
+$pdf->SetXY($x1, $y1 - 2); $pdf->SetFont('Helvetica', 'U', 8.5); $pdf->SetTextColor(...$red);
 $pdf->Cell($colW, 5, 'Directions in Google Maps', 0, 2, 'L', false, maps_directions_url($w));
 $y1 = $pdf->GetY() + 2;
 $pdf->SetY($top);
@@ -110,29 +110,29 @@ $pdf->SetY(max($y1, $y2) + 1);
 
 // Statement of work
 $pdf->Line(16, $pdf->GetY(), 16 + $W, $pdf->GetY()); $pdf->Ln(4);
-$pdf->SetFont('Helvetica', 'B', 13); $pdf->SetTextColor(...$navy);
-$pdf->MultiCell($W, 6.5, t($w['title']));
+$pdf->SetFont('Helvetica', 'B', 12); $pdf->SetTextColor(...$navy);
+$pdf->MultiCell($W, 6, t($w['title']));
 $pdf->Ln(1.5);
-$pdf->SetFont('Helvetica', 'B', 9); $pdf->SetTextColor(...$red);
+$pdf->SetFont('Helvetica', 'B', 8.5); $pdf->SetTextColor(...$red);
 $pdf->Cell($W, 5, 'STATEMENT OF WORK', 0, 1);
-$pdf->SetFont('Helvetica', '', 10.5); $pdf->SetTextColor(20);
-$pdf->MultiCell($W, 5.4, t(trim($w['description'])));
+$pdf->SetFont('Helvetica', '', 9.5); $pdf->SetTextColor(20);
+$pdf->MultiCell($W, 4.6, t(trim($w['description'])));
 $pdf->Ln(3);
 
 $reqs = photo_requests((int)$w['id']);
-$pdf->SetFont('Helvetica', 'B', 9); $pdf->SetTextColor(...$red);
+$pdf->SetFont('Helvetica', 'B', 8.5); $pdf->SetTextColor(...$red);
 $pdf->Cell($W, 5, 'PHOTOS TO UPLOAD WHEN DONE', 0, 1);
-$pdf->SetFont('Helvetica', '', 10.5); $pdf->SetTextColor(20);
-foreach ($reqs as $r) { $pdf->SetX(18); $pdf->MultiCell($W - 2, 5.2, t('[  ]  ' . $r['label'])); }
-$pdf->SetX(18); $pdf->MultiCell($W - 2, 5.2, t('[  ]  ' . ($reqs ? 'Any other photos of the finished work' : 'At least one photo of the finished work')));
-$pdf->SetX(18); $pdf->MultiCell($W - 2, 5.2, t('[  ]  This work order, signed by the site manager'));
+$pdf->SetFont('Helvetica', '', 9.5); $pdf->SetTextColor(20);
+foreach ($reqs as $r) { $pdf->SetX(18); $pdf->MultiCell($W - 2, 4.5, t('[  ]  ' . $r['label'])); }
+$pdf->SetX(18); $pdf->MultiCell($W - 2, 4.5, t('[  ]  ' . ($reqs ? 'Any other photos of the finished work' : 'At least one photo of the finished work')));
+$pdf->SetX(18); $pdf->MultiCell($W - 2, 4.5, t('[  ]  This work order, signed by the site manager'));
 $pdf->Ln(3);
 
 if ($w['completion_notes']) {
-    $pdf->SetFont('Helvetica', 'B', 9); $pdf->SetTextColor(...$red);
+    $pdf->SetFont('Helvetica', 'B', 8.5); $pdf->SetTextColor(...$red);
     $pdf->Cell($W, 5, "TECHNICIAN'S COMPLETION NOTES", 0, 1);
-    $pdf->SetFont('Helvetica', '', 10.5); $pdf->SetTextColor(20);
-    $pdf->MultiCell($W, 5.4, t(trim($w['completion_notes'])));
+    $pdf->SetFont('Helvetica', '', 9.5); $pdf->SetTextColor(20);
+    $pdf->MultiCell($W, 4.6, t(trim($w['completion_notes'])));
     $pdf->Ln(3);
 }
 
@@ -140,16 +140,16 @@ if ($w['completion_notes']) {
 function blank(FPDF $pdf, float $x, float $w, string $label, string $prefill = ''): void {
     $y = $pdf->GetY();
     $pdf->SetXY($x, $y);
-    $pdf->SetFont('Helvetica', '', 11); $pdf->SetTextColor(20);
+    $pdf->SetFont('Helvetica', '', 10); $pdf->SetTextColor(20);
     if ($prefill !== '') $pdf->Cell($w, 6, t($prefill), 0, 0);
     $pdf->Line($x, $y + 7, $x + $w, $y + 7);
     $pdf->SetXY($x, $y + 7.5);
-    $pdf->SetFont('Helvetica', '', 7.5); $pdf->SetTextColor(110);
-    $pdf->MultiCell($w, 3.6, t($label));
+    $pdf->SetFont('Helvetica', '', 7); $pdf->SetTextColor(110);
+    $pdf->MultiCell($w, 3.3, t($label));
     $pdf->SetY($y);   // fields on the same row share one baseline
 }
 function heading(FPDF $pdf, float $W, string $text, array $red): void {
-    $pdf->SetFont('Helvetica', 'B', 9); $pdf->SetTextColor(...$red);
+    $pdf->SetFont('Helvetica', 'B', 8.5); $pdf->SetTextColor(...$red);
     $pdf->Cell($W, 5, $text, 0, 1);
 }
 
@@ -178,16 +178,16 @@ function signoff(FPDF $pdf, float $W, ?string $tech, array $red): void {
     $pdf->Ln(15);
 
     heading($pdf, $W, 'TECHNICIAN ACKNOWLEDGMENT', $red);
-    $pdf->SetFont('Helvetica', '', 9); $pdf->SetTextColor(20);
-    $pdf->MultiCell($W, 4.3, t(NO_SHOW_POLICY . ' By signing, I confirm I performed the work described above.'));
+    $pdf->SetFont('Helvetica', '', 8.5); $pdf->SetTextColor(20);
+    $pdf->MultiCell($W, 4, t(NO_SHOW_POLICY . ' By signing, I confirm I performed the work described above.'));
     $pdf->Ln(1);
     $c1 = ($W - 12) * 0.34; $c2 = ($W - 12) * 0.44; $c3 = ($W - 12) - $c1 - $c2;
     blank($pdf, 16, $c1, 'Technician printed name', $tech ?: '');
     blank($pdf, 16 + $c1 + 6, $c2, 'Technician signature');
     blank($pdf, 16 + $c1 + $c2 + 12, $c3, 'Date');
     $pdf->Ln(12);
-    $pdf->SetFont('Helvetica', 'I', 8); $pdf->SetTextColor(90);
-    $pdf->MultiCell($W, 4, t('Technician: after the manager signs, take a phone photo of this page and upload it with your completion photos on the job page. The provider reviews both before approving payment.'));
+    $pdf->SetFont('Helvetica', 'I', 7.5); $pdf->SetTextColor(90);
+    $pdf->MultiCell($W, 3.6, t('Technician: after the manager signs, take a phone photo of this page and upload it with your completion photos on the job page. The provider reviews both before approving payment.'));
 }
 
 // Measure the section on a scratch page, then place it so it never splits.
@@ -211,8 +211,8 @@ if (($instr = job_instructions((int)$w['id'])) !== null) {
     $pdf->Cell($W, 5, t($num . '   |   ' . $w['title'] . '   |   from ' . $w['company']), 0, 1);
     $pdf->SetDrawColor(...$red); $pdf->SetLineWidth(0.6); $pdf->Line(16, $pdf->GetY() + 2, 16 + $W, $pdf->GetY() + 2);
     $pdf->SetLineWidth(0.2); $pdf->SetDrawColor(...$rule); $pdf->Ln(6);
-    $pdf->SetFont('Helvetica', '', 10.5); $pdf->SetTextColor(20);
-    $pdf->MultiCell($W, 5.4, t($instr));
+    $pdf->SetFont('Helvetica', '', 9.5); $pdf->SetTextColor(20);
+    $pdf->MultiCell($W, 4.6, t($instr));
 }
 
 $file = $num . '.pdf';
