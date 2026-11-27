@@ -43,7 +43,18 @@ $pdf->SetTitle(t("Work order $num"));
 $pdf->SetAuthor('Electro Service, Inc.');
 $pdf->AddPage();
 $W = $pdf->GetPageWidth() - 32;
-$navy = [19, 5, 59]; $red = [128, 0, 25]; $rule = [190, 196, 205];
+// Black and white only, so it prints and copies cleanly on any printer.
+$navy = [0, 0, 0]; $red = [0, 0, 0]; $rule = [170, 170, 170];
+$tmpFiles = [];
+function grayscale_copy(string $path, array &$tmpFiles): string {
+    $img = @imagecreatefromjpeg($path);
+    if (!$img) return $path;
+    imagefilter($img, IMG_FILTER_GRAYSCALE);
+    $out = sys_get_temp_dir() . '/wo' . bin2hex(random_bytes(8)) . '.jpg';
+    imagejpeg($img, $out, 90); imagedestroy($img);
+    $tmpFiles[] = $out;
+    return $out;
+}
 
 // Header: the buyer's brand large, Electro Service small as the platform providing the work order.
 $blogo = provider_logo((int)$w['provider_id']);
@@ -51,7 +62,7 @@ $boxW = 100; $boxH = 20;
 if ($blogo) {
     $ratio = $blogo['width'] / max(1, $blogo['height']);
     $lw = min($boxW, $boxH * $ratio); $lh = $lw / $ratio;
-    $pdf->Image($blogo['path'], 16, 12 + ($boxH - $lh) / 2, $lw, $lh, 'JPG');
+    $pdf->Image(grayscale_copy($blogo['path'], $tmpFiles), 16, 12 + ($boxH - $lh) / 2, $lw, $lh, 'JPG');
 } else {
     $pdf->SetXY(16, 12);
     $pdf->SetFont('Helvetica', 'B', 22); $pdf->SetTextColor(20);
@@ -61,7 +72,7 @@ if ($blogo) {
 $pdf->SetXY(16, 33.5);
 $pdf->SetFont('Helvetica', '', 7.5); $pdf->SetTextColor(110);
 $pdf->Cell(36, 4.4, 'Work order provided through', 0, 0, 'L');
-$pdf->Image(__DIR__ . '/../../private/lib/logo-print.png', 16 + 36.5, 33.1, 19);
+$pdf->Image(__DIR__ . '/../../private/lib/logo-print-bw.png', 16 + 36.5, 33.1, 19);
 $pdf->SetXY(16, 13);
 $pdf->SetFont('Helvetica', 'B', 18); $pdf->SetTextColor(...$navy);
 $pdf->Cell($W, 8, 'WORK ORDER', 0, 2, 'R');
@@ -96,7 +107,7 @@ $y1 = $pdf->GetY() + 2;
 $pdf->SetY($top);
 $techPhoto = $w['tech_id'] ? tech_photo_path((int)$w['tech_id']) : null;
 if ($techPhoto) {
-    $pdf->Image($techPhoto, $x2 + $colW - 22, $top, 22, 22, 'JPG');
+    $pdf->Image(grayscale_copy($techPhoto, $tmpFiles), $x2 + $colW - 22, $top, 22, 22, 'JPG');
     $y2 = fact($pdf, $x2, $colW - 26, 'Technician', ($tech ?: '') . "\nPhoto at right. Check ID on arrival.");
     $y2 = max($y2, $top + 24);
 } else {
@@ -218,3 +229,4 @@ if (($instr = job_instructions((int)$w['id'])) !== null) {
 $file = $num . '.pdf';
 header('Cache-Control: private, no-store');
 $pdf->Output(isset($_GET['download']) ? 'D' : 'I', $file);
+foreach ($tmpFiles as $f) @unlink($f);
