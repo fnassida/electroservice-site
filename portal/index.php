@@ -54,6 +54,7 @@ page_start('Dashboard', $u);
       <?php if (stripe_enabled()): ?><a class="btn <?= $canPay ? 'plain' : 'primary' ?>" href="/portal/payouts.php"><?= $canPay ? 'View payouts' : 'Set up payouts' ?></a><?php endif; ?>
     </li>
   </ol>
+  <details class="standards-card"><summary>On-site standards you agreed to</summary><?= onsite_standards_html() ?></details>
   <?php if (!$ins['insured'] || $ins['expiring_soon']) echo insurance_offer_html('dashboard'); ?>
   <?php if ($profileDone && $ins['insured'] && $photoUrl && $idOk): ?>
     <p><a class="btn primary" href="/portal/jobs/browse.php">Find work near you</a> <a class="btn plain" href="/portal/jobs/">Your jobs and offers</a></p>

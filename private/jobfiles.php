@@ -475,3 +475,15 @@ function provider_logo_save(array $f, int $userId): ?string {
     log_activity($userId, 'logo_uploaded');
     return null;
 }
+
+// ---------------------------------------------------------------- tech on-site standards
+const ONSITE_STANDARDS = [
+    'Dress in business-appropriate clothes: a plain collared shirt or polo, with no logos or slogans.',
+    'Wear closed work shoes. No sandals or open-toed shoes. Some sites, such as factories, require steel-toe boots, so check the job instructions.',
+    'Don\'t bring food or drinks onto the customer\'s site.',
+    'Never bring a firearm or any other weapon onto customer premises.',
+];
+
+function onsite_standards_html(): string {
+    return '<ul class="standards">' . implode('', array_map(fn($s) => '<li>' . e($s) . '</li>', ONSITE_STANDARDS)) . '</ul>';
+}

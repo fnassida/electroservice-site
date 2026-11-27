@@ -468,6 +468,7 @@ page_start($w['title'], $u);
   <?php elseif ($isAssigned && $w['status'] === 'assigned'): ?>
     <h2>You're booked</h2>
     <p><?= $payOn ? 'Payment is secured. ' : '' ?>Check in when you arrive on site. <?= e(NO_SHOW_POLICY) ?></p>
+    <details class="standards-card"><summary>On-site standards</summary><?= onsite_standards_html() ?></details>
     <form method="post" data-gps class="stack" style="max-width:40rem"><?= csrf_field() ?>
       <label class="check"><input type="checkbox" name="share_gps" value="1" checked> <span>Share my location with the provider to confirm I'm on site</span></label>
       <input type="hidden" name="gps_lat"><input type="hidden" name="gps_lng"><input type="hidden" name="gps_acc">

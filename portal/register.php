@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($in['role'] === 'provider' && $in['company'] === '') $errors[] = 'Enter your company name.';
     if (strlen($pass) < 10) $errors[] = 'Use a password of at least 10 characters.';
     if (empty($_POST['terms'])) $errors[] = 'You need to agree to the Terms of Service and Privacy Policy.';
+    if ($in['role'] === 'tech' && empty($_POST['standards'])) $errors[] = 'Techs need to agree to the on-site standards.';
 
     if (!$errors) {
         $st = db()->prepare('SELECT 1 FROM users WHERE email = ?');
@@ -35,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        $in['role'] === 'provider' ? $in['company'] : null, now(), now()]);
         $id = (int)db()->lastInsertId();
         log_activity($id, 'register', $in['role']);
+        if ($in['role'] === 'tech') log_activity($id, 'standards_accepted');
         login_user(['id' => $id]);
         send_verification(['id' => $id, 'email' => $in['email'], 'full_name' => $in['full_name']]);
         flash('Your account is ready. We sent a link to ' . $in['email'] . ' to confirm your email.');
@@ -65,9 +67,21 @@ page_start('Sign up');
     <label>Email <input type="email" name="email" autocomplete="email" required value="<?= e($in['email']) ?>"></label>
     <label>Password <span class="hint">At least 10 characters.</span>
       <input type="password" name="password" autocomplete="new-password" required minlength="10"></label>
+    <fieldset id="standards-box" <?= $in['role'] === 'tech' ? '' : 'hidden' ?>>
+      <legend>On-site standards for techs</legend>
+      <p class="hint" style="margin:0">Every tech on Electro Service represents the provider at their customer's site.</p>
+      <?= onsite_standards_html() ?>
+      <label class="check"><input type="checkbox" name="standards" value="1" <?= !empty($_POST['standards']) ? 'checked' : '' ?>>
+        <span>I agree to follow these standards on every job</span></label>
+    </fieldset>
     <label class="check"><input type="checkbox" name="terms" value="1">
       <span>I agree to the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>, including keeping other users' information confidential and booking all work with people I meet here through Electro Service.</span></label>
     <div><button class="btn primary">Create account</button></div>
   </form>
 </div>
+<script>
+document.querySelectorAll('input[name=role]').forEach(function (r) {
+  r.addEventListener('change', function () { document.getElementById('standards-box').hidden = document.querySelector('input[name=role]:checked').value !== 'tech'; });
+});
+</script>
 <?php page_end();

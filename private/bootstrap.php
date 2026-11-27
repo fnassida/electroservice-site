@@ -354,7 +354,7 @@ function send_booking_emails(int $woId): void {
         . "Job page and printable work order: " . site_link('/portal/jobs/view.php?id=' . $w['id']);
     send_mail($tech['email'], "Booked: job #{$w['id']} on " . date('M j', strtotime($w['start_at'])),
         "You're booked for \"{$w['title']}\" with {$w['company']}.\n\nWhen: $when (local time)\nWhere: $where\nDirections: " . maps_directions_url($w)
-        . "\n\n" . NO_SHOW_POLICY . "\n\nPrint the work order and bring it. Have the site manager sign it, then upload a photo of it with your completion photos.\n\n" . $links);
+        . "\n\n" . NO_SHOW_POLICY . "\n\nOn-site standards:\n- " . implode("\n- ", ONSITE_STANDARDS) . "\n\nPrint the work order and bring it. Have the site manager sign it, then upload a photo of it with your completion photos.\n\n" . $links);
     send_mail($prov['email'], "Booked: {$tech['full_name']} for job #{$w['id']}",
         "{$tech['full_name']} is booked for \"{$w['title']}\".\n\nWhen: $when (local time)\nWhere: $where\n\n" . $links);
 }

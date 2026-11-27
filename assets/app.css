@@ -191,3 +191,6 @@ dl.remote{display:grid;grid-template-columns:auto 1fr;gap:.3rem .8rem;margin:0}
 dl.remote dt{color:var(--muted)}
 dl.remote dd{margin:0}
 .mono{font-family:ui-monospace,Consolas,monospace;font-size:1.1rem;letter-spacing:.04em}
+ul.standards{margin:.5rem 0;padding-left:1.2rem}
+ul.standards li{margin:.25rem 0}
+.standards-card{background:#fff;border:1px solid var(--line);border-radius:6px;padding:.7rem 1rem;margin:1rem 0;max-width:46rem}
