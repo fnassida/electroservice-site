@@ -481,7 +481,7 @@ const ONSITE_STANDARDS = [
     'Dress in business-appropriate clothes: a plain collared shirt or polo, with no logos or slogans.',
     'Wear closed work shoes. No sandals or open-toed shoes. Some sites, such as factories, require steel-toe boots, so check the job instructions.',
     'Don\'t bring food or drinks onto the customer\'s site.',
-    'No smoking or vaping on the customer\'s premises, including outside the building.',
+    'No smoking or vaping inside the customer\'s building.',
     'No alcohol or drugs: don\'t drink or use drugs before or during a job, and don\'t have alcohol or illegal drugs in your vehicle or on the customer\'s site.',
     'Never bring a firearm or any other weapon onto customer premises.',
 ];
