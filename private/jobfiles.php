@@ -433,3 +433,45 @@ function save_job_remote(array $wo, string $side): ?string {
 function clear_job_remote(int $woId): void {
     db()->prepare('DELETE FROM job_remote WHERE work_order_id = ?')->execute([$woId]);
 }
+
+// ---------------------------------------------------------------- provider logo
+function provider_logo(int $userId): ?array {
+    $st = db()->prepare('SELECT * FROM provider_logos WHERE user_id = ?');
+    $st->execute([$userId]);
+    $r = $st->fetch();
+    if (!$r) return null;
+    $r['path'] = upload_dir() . '/logos/' . basename($r['file_name']);
+    return is_file($r['path']) ? $r : null;
+}
+
+// Saves a logo as a white-backed JPEG (so it prints the same everywhere), at most 1200 px wide.
+function provider_logo_save(array $f, int $userId): ?string {
+    if (($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return 'Choose your logo file.';
+    if ($f['error'] !== UPLOAD_ERR_OK) return 'The upload failed. Try again.';
+    if ($f['size'] > 10 * 1024 * 1024) return 'The logo is larger than 10 MB.';
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    $img = match ($mime) {
+        'image/png' => @imagecreatefrompng($f['tmp_name']),
+        'image/jpeg' => @imagecreatefromjpeg($f['tmp_name']),
+        'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($f['tmp_name']) : false,
+        'image/gif' => @imagecreatefromgif($f['tmp_name']),
+        default => false,
+    };
+    if (!$img) return 'Upload your logo as a PNG or JPG image.';
+    $w = imagesx($img); $h = imagesy($img);
+    if ($w < 100 || $h < 30) { imagedestroy($img); return 'The logo is too small. Use an image at least 300 pixels wide.'; }
+    $scale = min(1, 1200 / $w); $nw = (int)round($w * $scale); $nh = (int)round($h * $scale);
+    $out = imagecreatetruecolor($nw, $nh);
+    imagefill($out, 0, 0, imagecolorallocate($out, 255, 255, 255));
+    imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    $dir = upload_dir() . '/logos';
+    if (!is_dir($dir)) mkdir($dir, 0750, true);
+    $name = bin2hex(random_bytes(16)) . '.jpg';
+    imagejpeg($out, "$dir/$name", 92);
+    imagedestroy($img); imagedestroy($out);
+    if ($old = provider_logo($userId)) @unlink($old['path']);
+    db()->prepare('DELETE FROM provider_logos WHERE user_id = ?')->execute([$userId]);
+    db()->prepare('INSERT INTO provider_logos (user_id, file_name, width, height, updated_at) VALUES (?,?,?,?,?)')->execute([$userId, $name, $nw, $nh, now()]);
+    log_activity($userId, 'logo_uploaded');
+    return null;
+}

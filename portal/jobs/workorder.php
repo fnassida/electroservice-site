@@ -45,8 +45,23 @@ $pdf->AddPage();
 $W = $pdf->GetPageWidth() - 32;
 $navy = [19, 5, 59]; $red = [128, 0, 25]; $rule = [190, 196, 205];
 
-// Header
-$pdf->Image(__DIR__ . '/../../private/lib/logo-print.png', 16, 13, 58);
+// Header: the buyer's brand large, Electro Service small as the platform providing the work order.
+$blogo = provider_logo((int)$w['provider_id']);
+$boxW = 100; $boxH = 20;
+if ($blogo) {
+    $ratio = $blogo['width'] / max(1, $blogo['height']);
+    $lw = min($boxW, $boxH * $ratio); $lh = $lw / $ratio;
+    $pdf->Image($blogo['path'], 16, 12 + ($boxH - $lh) / 2, $lw, $lh, 'JPG');
+} else {
+    $pdf->SetXY(16, 12);
+    $pdf->SetFont('Helvetica', 'B', 22); $pdf->SetTextColor(20);
+    $size = 22; while ($size > 12 && $pdf->GetStringWidth(t($w['company'])) > $boxW) { $size--; $pdf->SetFontSize($size); }
+    $pdf->Cell($boxW, $boxH, t($w['company']), 0, 0, 'L');
+}
+$pdf->SetXY(16, 33.5);
+$pdf->SetFont('Helvetica', '', 7.5); $pdf->SetTextColor(110);
+$pdf->Cell(36, 4.4, 'Work order provided through', 0, 0, 'L');
+$pdf->Image(__DIR__ . '/../../private/lib/logo-print.png', 16 + 36.5, 33.1, 19);
 $pdf->SetXY(16, 13);
 $pdf->SetFont('Helvetica', 'B', 18); $pdf->SetTextColor(...$navy);
 $pdf->Cell($W, 8, 'WORK ORDER', 0, 2, 'R');
@@ -54,9 +69,9 @@ $pdf->SetFont('Helvetica', '', 11); $pdf->SetTextColor(40);
 $pdf->Cell($W, 6, $num, 0, 2, 'R');
 $pdf->SetFont('Helvetica', '', 9); $pdf->SetTextColor(110);
 $pdf->Cell($W, 5, t('Printed ' . date('M j, Y')), 0, 2, 'R');
-$pdf->SetY(34);
+$pdf->SetY(40);
 $pdf->SetDrawColor(...$red); $pdf->SetLineWidth(0.8);
-$pdf->Line(16, 34, 16 + $W, 34);
+$pdf->Line(16, 40, 16 + $W, 40);
 $pdf->SetLineWidth(0.2); $pdf->SetDrawColor(...$rule);
 $pdf->Ln(5);
 
@@ -73,7 +88,7 @@ function fact(FPDF $pdf, float $x, float $w, string $label, string $value): floa
 $colW = ($W - 8) / 2; $x1 = 16; $x2 = 16 + $colW + 8;
 $top = $pdf->GetY();
 $start = strtotime($w['start_at']);
-$y1 = fact($pdf, $x1, $colW, 'Provider', $w['company'] . "\n" . $w['provider_name']);
+$y1 = fact($pdf, $x1, $colW, 'Provider contact', $w['provider_name'] . ', ' . $w['company']);
 $pdf->SetY($y1); $y1 = fact($pdf, $x1, $colW, 'Job site', $w['street'] . "\n" . $w['city'] . ', ' . $w['state'] . ' ' . $w['zip']);
 $pdf->SetXY($x1, $y1 - 2); $pdf->SetFont('Helvetica', 'U', 9); $pdf->SetTextColor(...$red);
 $pdf->Cell($colW, 5, 'Directions in Google Maps', 0, 2, 'L', false, maps_directions_url($w));
@@ -89,8 +104,8 @@ if ($techPhoto) {
 }
 $pdf->SetY($y2);
 $y2 = fact($pdf, $x2, $colW, 'Scheduled', date('l, M j, Y \a\t g:i a', $start) . ($w['est_hours'] ? "\nEstimated " . rtrim(rtrim((string)$w['est_hours'], '0'), '.') . ' hours' : ''));
-$pdf->SetY($y2);
-$y2 = fact($pdf, $x2, $colW, 'Skills', skill_labels($w['skills']));
+$pdf->SetY($y1);
+$y1 = fact($pdf, $x1, $colW, 'Skills', skill_labels($w['skills']));
 $pdf->SetY(max($y1, $y2) + 1);
 
 // Statement of work

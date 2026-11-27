@@ -74,7 +74,8 @@ page_start('Dashboard', $u);
     <li><b><?= (int)($c['assigned'] ?? 0) + (int)($c['in_progress'] ?? 0) ?></b> booked or in progress</li>
     <li><b><?= (int)($c['submitted'] ?? 0) ?></b> waiting for your approval</li>
   </ul>
-  <p><a class="btn primary" href="/portal/jobs/new.php">Post a job</a> <a class="btn plain" href="/portal/jobs/">View your jobs</a></p>
+  <p><a class="btn primary" href="/portal/jobs/new.php">Post a job</a> <a class="btn plain" href="/portal/jobs/">View your jobs</a>
+    <a class="btn plain" href="/portal/logo.php"><?= provider_logo((int)$u['id']) ? 'Company logo' : 'Add your logo to work orders' ?></a></p>
   <p class="muted">Jobs must pay the tech at least $<?= number_format((float)cfg('min_job_amount', 50), 2) ?>. A <?= round((float)cfg('platform_fee_rate', 0.10) * 100) ?>% platform fee is added on top.</p>
 <?php endif; ?>
 <?php page_end();

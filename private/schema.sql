@@ -309,3 +309,13 @@ CREATE TABLE IF NOT EXISTS job_remote (
     note VARCHAR(500) NULL,
     updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Provider (buyer) company logo, printed large on their work orders.
+CREATE TABLE IF NOT EXISTS provider_logos (
+    user_id INTEGER PRIMARY KEY,
+    file_name VARCHAR(80) NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
