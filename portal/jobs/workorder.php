@@ -190,7 +190,7 @@ function signoff(FPDF $pdf, float $W, ?string $tech, array $red): void {
 
     heading($pdf, $W, 'TECHNICIAN ACKNOWLEDGMENT', $red);
     $pdf->SetFont('Helvetica', '', 8.5); $pdf->SetTextColor(20);
-    $pdf->MultiCell($W, 4, t(NO_SHOW_POLICY . ' On site I followed Electro Service standards: business attire (plain collared shirt or polo, no logos), closed work shoes or steel toes where required, no food or drinks, and no firearms or weapons. By signing, I confirm I performed the work described above.'));
+    $pdf->MultiCell($W, 4, t(NO_SHOW_POLICY . ' On site I followed Electro Service standards: business attire (plain collared shirt or polo, no logos), closed work shoes or steel toes where required, no food or drinks, no smoking or vaping, and no firearms or weapons. By signing, I confirm I performed the work described above.'));
     $pdf->Ln(1);
     $c1 = ($W - 12) * 0.34; $c2 = ($W - 12) * 0.44; $c3 = ($W - 12) - $c1 - $c2;
     blank($pdf, 16, $c1, 'Technician printed name', $tech ?: '');
