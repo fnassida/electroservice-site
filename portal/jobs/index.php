@@ -28,7 +28,7 @@ if ($u['role'] === 'provider'):
     $active = array_filter($all, fn($r) => !in_array($r['status'], ['approved', 'cancelled'], true));
     $done = array_filter($all, fn($r) => in_array($r['status'], ['approved', 'cancelled'], true));
 ?>
-  <div class="head-row"><h1>Your jobs</h1><a class="btn primary" href="/portal/jobs/new.php">Post a job</a></div>
+  <div class="head-row"><h1>Your jobs</h1><span><a class="btn plain" href="/portal/jobs/templates.php">Templates</a> <a class="btn primary" href="/portal/jobs/new.php">Post a job</a></span></div>
   <h2>Active</h2><?php job_rows(array_values($active), 'provider'); ?>
   <h2 style="margin-top:2rem">Finished and cancelled</h2><?php job_rows(array_values($done), 'provider'); ?>
 <?php else:

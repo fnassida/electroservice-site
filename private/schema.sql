@@ -208,3 +208,82 @@ CREATE TABLE IF NOT EXISTS stripe_events (
     type VARCHAR(80) NOT NULL,
     received_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Completion proof: photos of the finished work and the signed work order, uploaded by the tech.
+CREATE TABLE IF NOT EXISTS job_files (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    work_order_id INTEGER NOT NULL,
+    uploaded_by INTEGER NOT NULL,
+    kind VARCHAR(16) NOT NULL,            -- photo | signoff
+    request_id INTEGER NULL,              -- which requested photo this answers, if any
+    file_name VARCHAR(80) NOT NULL,
+    original_name VARCHAR(190) NOT NULL,
+    mime VARCHAR(40) NOT NULL,
+    bytes INTEGER NOT NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Photos the provider asks for (one row per requested shot), e.g. "New access point mounted".
+CREATE TABLE IF NOT EXISTS job_photo_requests (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    work_order_id INTEGER NOT NULL,
+    label VARCHAR(200) NOT NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Each tech's photo of themselves. Required before they can take jobs.
+CREATE TABLE IF NOT EXISTS tech_photos (
+    user_id INTEGER PRIMARY KEY,
+    file_name VARCHAR(80) NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Driver's license identity check. The admin compares it with the tech's photo and name.
+-- The license image is deleted when the check is approved, so only the result is kept.
+CREATE TABLE IF NOT EXISTS id_checks (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    user_id INTEGER NOT NULL,
+    file_name VARCHAR(80) NULL,
+    mime VARCHAR(40) NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
+    note VARCHAR(500) NULL,
+    reviewed_by INTEGER NULL,
+    reviewed_at DATETIME NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Optional GPS location the tech shares at check-in and when submitting the work.
+CREATE TABLE IF NOT EXISTS job_locations (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    work_order_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    event VARCHAR(16) NOT NULL,           -- check_in | submit
+    lat DOUBLE NOT NULL,
+    lng DOUBLE NOT NULL,
+    accuracy_m INTEGER NULL,
+    miles_from_site DOUBLE NOT NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Optional detailed instructions from the provider, printed as a separate page after the work order.
+CREATE TABLE IF NOT EXISTS job_instructions (
+    work_order_id INTEGER PRIMARY KEY,
+    body TEXT NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+;
+
+-- Provider's reusable job boilerplate: scope, skills, pay, requested photos, instructions.
+CREATE TABLE IF NOT EXISTS job_templates (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    provider_id INTEGER NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    data TEXT NOT NULL,                   -- JSON of the job form fields
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

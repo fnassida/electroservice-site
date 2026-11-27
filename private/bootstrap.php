@@ -10,6 +10,7 @@ if (!is_file($configFile)) {
 $CONFIG = require $configFile;
 require __DIR__ . '/sms.php';
 require __DIR__ . '/stripe.php';
+require __DIR__ . '/jobfiles.php';
 
 // Blank values and leftover placeholders ("PASTE ...", "CHANGE ...") count as not set.
 function cfg(string $key, $default = null) {
@@ -308,7 +309,7 @@ function skill_labels(?string $csv): string {
 // A tech can be offered or request work once their profile has a location and their insurance is approved and current.
 function tech_ready(int $userId): bool {
     $p = tech_profile($userId);
-    return $p && $p['lat'] !== null && $p['skills'] && insurance_state($userId)['insured'];
+    return $p && $p['lat'] !== null && $p['skills'] && insurance_state($userId)['insured'] && tech_photo($userId) && identity_verified($userId);
 }
 
 function load_wo(int $id): ?array {
@@ -335,7 +336,27 @@ function assign_wo(int $woId, int $techId): bool {
     $pdo->prepare("UPDATE wo_requests SET status = 'closed', decided_at = ? WHERE work_order_id = ? AND status = 'pending'")
         ->execute([now(), $woId]);
     $pdo->commit();
+    try { send_booking_emails($woId); } catch (Throwable $e) { error_log('booking email: ' . $e->getMessage()); }
     return true;
+}
+
+// Tells the provider and the tech that the job is booked, with links to add it to their calendars.
+function send_booking_emails(int $woId): void {
+    $w = load_wo($woId);
+    if (!$w || !$w['tech_id']) return;
+    $t = db()->prepare('SELECT full_name, email FROM users WHERE id = ?'); $t->execute([(int)$w['tech_id']]); $tech = $t->fetch();
+    $p = db()->prepare('SELECT full_name, email FROM users WHERE id = ?'); $p->execute([(int)$w['provider_id']]); $prov = $p->fetch();
+    $when = date('l, M j, Y \a\t g:i a', strtotime($w['start_at']));
+    $where = $w['street'] . ', ' . $w['city'] . ', ' . $w['state'] . ' ' . $w['zip'];
+    $links = "Add it to your calendar:\n"
+        . "  Google Calendar: " . google_calendar_url($w) . "\n"
+        . "  Outlook or Apple Calendar (reminds you the day before and an hour before): " . site_link('/portal/jobs/calendar.php?id=' . $w['id']) . "\n\n"
+        . "Job page and printable work order: " . site_link('/portal/jobs/view.php?id=' . $w['id']);
+    send_mail($tech['email'], "Booked: job #{$w['id']} on " . date('M j', strtotime($w['start_at'])),
+        "You're booked for \"{$w['title']}\" with {$w['company']}.\n\nWhen: $when (local time)\nWhere: $where\nDirections: " . maps_directions_url($w)
+        . "\n\n" . NO_SHOW_POLICY . "\n\nPrint the work order and bring it. Have the site manager sign it, then upload a photo of it with your completion photos.\n\n" . $links);
+    send_mail($prov['email'], "Booked: {$tech['full_name']} for job #{$w['id']}",
+        "{$tech['full_name']} is booked for \"{$w['title']}\".\n\nWhen: $when (local time)\nWhere: $where\n\n" . $links);
 }
 
 // ---------------------------------------------------------------- chat

@@ -58,6 +58,7 @@ page_start('Find techs', $u);
     <li>
       <div class="dist"><b><?= round($t['miles']) ?></b> mi</div>
       <div>
+        <?= avatar_html((int)$t['user_id'], $t['full_name']) ?>
         <h3><?= e($t['full_name']) ?></h3>
         <?php if ($t['headline']): ?><p><?= e($t['headline']) ?></p><?php endif; ?>
         <p class="muted"><?= e($t['city'] . ', ' . $t['state']) ?>. Insured to $<?= number_format($t['coverage']) ?>. <?= e(skill_labels($t['skills'])) ?></p>

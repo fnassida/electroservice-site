@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $counts = db()->query("SELECT role, COUNT(*) n FROM users GROUP BY role")->fetchAll(PDO::FETCH_KEY_PAIR);
 $pendingIns = (int)db()->query("SELECT COUNT(*) FROM insurance_docs WHERE status = 'pending'")->fetchColumn();
+$pendingIds = (int)db()->query("SELECT COUNT(*) FROM id_checks WHERE status = 'pending'")->fetchColumn();
 $users  = db()->query("SELECT * FROM users WHERE role <> 'admin' ORDER BY created_at DESC LIMIT 200")->fetchAll();
 $log    = db()->query("SELECT a.*, u.full_name, u.role FROM activity_log a LEFT JOIN users u ON u.id = a.user_id
                        ORDER BY a.id DESC LIMIT 50")->fetchAll();
@@ -26,8 +27,10 @@ page_start('Admin', $admin);
   <li><b><?= (int)($counts['tech'] ?? 0) ?></b> techs</li>
   <li><b><?= (int)($counts['provider'] ?? 0) ?></b> providers</li>
   <li><b><?= $pendingIns ?></b> insurance to review</li>
+  <li><b><?= $pendingIds ?></b> identity checks to review</li>
 </ul>
 <p><a class="btn <?= $pendingIns ? 'primary' : 'plain' ?>" href="/portal/admin/insurance.php">Review insurance</a>
+  <a class="btn <?= $pendingIds ? 'primary' : 'plain' ?>" href="/portal/admin/identity.php">Review identity checks</a>
   <a class="btn plain" href="/portal/admin/payments.php">Payments</a>
   <a class="btn plain" href="/portal/admin/email.php">Email forwarding</a>
   <a class="btn plain" href="/portal/admin/texts.php">Texts</a>
@@ -42,7 +45,7 @@ page_start('Admin', $admin);
   <tbody>
   <?php foreach ($users as $r): ?>
     <tr>
-      <td><?= e($r['full_name']) ?> <?php if ($r['status'] !== 'active'): ?><span class="tag suspended">Suspended</span><?php endif; ?>
+      <td><?php if ($r['role'] === 'tech') echo avatar_html((int)$r['id'], $r['full_name']) ?: '<span class="tag suspended">No photo</span> '; ?><?= e($r['full_name']) ?> <?php if ($r['status'] !== 'active'): ?><span class="tag suspended">Suspended</span><?php endif; ?>
         <?php if (!is_verified($r)): ?><span class="tag">Email not confirmed</span><?php endif; ?></td>
       <td><span class="tag <?= e($r['role']) ?>"><?= e(ucfirst($r['role'])) ?></span></td>
       <td><?= e($r['email']) ?></td>

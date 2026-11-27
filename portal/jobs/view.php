@@ -26,6 +26,11 @@ $back = '/portal/jobs/view.php?id=' . (int)$w['id'];
 $payOn = stripe_enabled();
 $payment = job_payment((int)$w['id']);
 $paid = $payment && in_array($payment['status'], ['paid', 'disputed'], true);
+$seeProof = can_see_job_files($u, $w);
+$photoReqs = photo_requests((int)$w['id']);
+$files = $seeProof ? job_files((int)$w['id']) : [];
+$canEditRequests = $isOwner && in_array($w['status'], ['open', 'assigned', 'in_progress'], true);
+$canUpload = $isAssigned && $w['status'] === 'in_progress';
 
 // ---------------------------------------------------------------- actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
@@ -61,6 +66,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
             db()->prepare("UPDATE wo_requests SET status = 'closed', decided_at = ? WHERE work_order_id = ? AND status = 'pending'")->execute([now(), $woId]);
             log_activity($uid, 'job_cancelled', "#$woId");
             flash('Job cancelled.' . ($refundMsg ? ' ' . $refundMsg : ''));
+        } elseif ($a === 'add_photo_request' && $canEditRequests) {
+            $added = 0;
+            foreach (photo_request_lines((string)($_POST['label'] ?? '')) as $l) {
+                if (count(photo_requests($woId)) >= 10) { flash('You can ask for at most 10 photos.'); break; }
+                add_photo_request($woId, $l); $added++;
+            }
+            if ($added) { log_activity($uid, 'photo_requested', "#$woId"); flash($added === 1 ? 'Photo added to the list.' : "$added photos added to the list."); }
+        } elseif ($a === 'save_instructions' && $canEditRequests) {
+            save_job_instructions($woId, (string)($_POST['instructions'] ?? ''));
+            log_activity($uid, 'instructions_saved', "#$woId");
+            flash('Detailed instructions saved.' . ($w['tech_id'] ? ' The tech can see the update now.' : ''));
+            redirect($back . '#instructions');
+        } elseif ($a === 'remove_photo_request' && $canEditRequests) {
+            $rid = (int)($_POST['request_id'] ?? 0);
+            $used = array_filter($files, fn($f) => (int)$f['request_id'] === $rid);
+            if ($used) flash('The tech has already uploaded that photo, so it stays on the list.');
+            else { db()->prepare('DELETE FROM job_photo_requests WHERE id = ? AND work_order_id = ?')->execute([$rid, $woId]); flash('Removed from the list.'); }
         } elseif ($a === 'approve' && $w['status'] === 'submitted') {
             db()->prepare("UPDATE work_orders SET status = 'approved', approved_at = ?, updated_at = ? WHERE id = ?")->execute([now(), now(), $woId]);
             log_activity($uid, 'job_approved', "#$woId");
@@ -92,12 +114,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role !== 'admin') {
             if ($payOn && !$paid) { flash('The provider hasn\'t paid for this job yet. You can check in once the payment is secured.'); redirect($back); }
             db()->prepare("UPDATE work_orders SET status = 'in_progress', checked_in_at = ?, updated_at = ? WHERE id = ?")->execute([now(), now(), $woId]);
             log_activity($uid, 'checked_in', "#$woId");
-            flash('Checked in.');
+            $loc = record_job_location($w, $uid, 'check_in');
+            flash('Checked in.' . ($loc ? ' Your location was shared with the provider.' : ''));
+        } elseif ($a === 'upload' && $canUpload) {
+            $kind = ($_POST['kind'] ?? '') === 'signoff' ? 'signoff' : 'photo';
+            $rid = (int)($_POST['request_id'] ?? 0);
+            $rid = $rid && array_filter($photoReqs, fn($r) => (int)$r['id'] === $rid) ? $rid : null;
+            $errs = []; $n = 0;
+            foreach (uploaded_list('files') as $f) {
+                if (($f['error'] ?? 0) === UPLOAD_ERR_NO_FILE) continue;
+                $err = job_file_save($f, $woId, $uid, $kind, $rid);
+                if ($err) $errs[] = $err; else $n++;
+            }
+            if ($errs) flash(implode(' ', $errs) . ($n ? " $n other file" . ($n > 1 ? 's were' : ' was') . ' uploaded.' : ''));
+            elseif ($n) flash($kind === 'signoff' ? 'Signed work order uploaded.' : ($n === 1 ? 'Photo uploaded.' : "$n photos uploaded."));
+            else flash('Choose a photo to upload.');
+            redirect($back . '#proof');
+        } elseif ($a === 'delete_file' && $canUpload) {
+            job_file_delete((int)($_POST['file_id'] ?? 0), $woId);
+            flash('Removed.');
+            redirect($back . '#proof');
         } elseif ($a === 'submit' && $isAssigned && $w['status'] === 'in_progress') {
             if (mb_strlen(trim($_POST['notes'] ?? '')) < 10) { flash('Add completion notes describing what you did.'); redirect($back); }
+            if (!job_files($woId, 'photo')) { flash('Upload at least one photo of the finished work before submitting.'); redirect($back . '#proof'); }
+            if ($miss = missing_photo_requests($woId)) { flash('The provider asked for photos you haven\'t uploaded yet: ' . implode('; ', array_map(fn($r) => $r['label'], $miss)) . '.'); redirect($back . '#proof'); }
             db()->prepare("UPDATE work_orders SET status = 'submitted', submitted_at = ?, completion_notes = ?, updated_at = ? WHERE id = ?")
                 ->execute([now(), mb_substr(trim($_POST['notes']), 0, 5000), now(), $woId]);
             log_activity($uid, 'work_submitted', "#$woId");
+            record_job_location($w, $uid, 'submit');
             flash('Work submitted. The provider will review and approve it.');
         }
     }
@@ -154,6 +198,87 @@ page_start($w['title'], $u);
       <h2 style="margin-top:1.6rem">Completion notes</h2>
       <div class="prose"><?= nl2br(e($w['completion_notes'])) ?></div>
     <?php endif; ?>
+    <?php $instr = $showAddress ? job_instructions((int)$w['id']) : null; ?>
+    <?php if ($instr !== null || $canEditRequests): ?>
+      <section id="instructions">
+      <h2 style="margin-top:1.6rem">Detailed instructions</h2>
+      <?php if ($canEditRequests): ?>
+        <form method="post" class="stack"><?= csrf_field() ?>
+          <label><span class="hint">Optional. Only the booked tech sees this, and it prints as a separate page after the work order.</span>
+            <textarea name="instructions" rows="<?= $instr ? 10 : 4 ?>" maxlength="20000"><?= e((string)$instr) ?></textarea></label>
+          <div><button class="btn plain" name="action" value="save_instructions"><?= $instr ? 'Save instructions' : 'Add instructions' ?></button></div>
+        </form>
+      <?php else: ?>
+        <div class="prose"><?= nl2br(e($instr)) ?></div>
+      <?php endif; ?>
+      </section>
+    <?php endif; ?>
+    <?php if ($seeProof && $w['status'] !== 'cancelled'): ?>
+      <p style="margin-top:1.4rem;display:flex;gap:.5rem;flex-wrap:wrap"><a class="btn plain" href="/portal/jobs/workorder.php?id=<?= (int)$w['id'] ?>" target="_blank" rel="noopener">Print work order (PDF)</a>
+      <?php if ($isOwner): ?><a class="btn plain" href="/portal/jobs/new.php?copy=<?= (int)$w['id'] ?>">Post a similar job</a><?php endif; ?>
+      <?php if ($w['tech_id'] && in_array($w['status'], ['assigned', 'in_progress'], true)): ?>
+        <a class="btn plain" href="<?= e(google_calendar_url($w)) ?>" target="_blank" rel="noopener">Add to Google Calendar</a>
+        <a class="btn plain" href="/portal/jobs/calendar.php?id=<?= (int)$w['id'] ?>">Add to Outlook or Apple Calendar</a>
+      <?php endif; ?></p>
+      <?php if ($w['tech_id'] && in_array($w['status'], ['assigned', 'in_progress'], true)): ?><p class="hint">The Outlook and Apple calendar file reminds you the day before and an hour before. Google Calendar uses your usual reminder settings.</p><?php endif; ?>
+    <?php endif; ?>
+    <?php if ($seeProof && ($photoReqs || $files || $canEditRequests || $canUpload)):
+      $byReq = []; $extra = []; $signoffs = [];
+      foreach ($files as $f) {
+          if ($f['kind'] === 'signoff') $signoffs[] = $f;
+          elseif ($f['request_id']) $byReq[(int)$f['request_id']][] = $f;
+          else $extra[] = $f;
+      }
+      $thumb = function (array $f) use ($canUpload): string {
+          $url = '/portal/jobs/file.php?id=' . (int)$f['id'];
+          $h = $f['mime'] === 'application/pdf'
+              ? '<a class="filecard" href="' . $url . '" target="_blank" rel="noopener">PDF: ' . e($f['original_name']) . '</a>'
+              : '<a href="' . $url . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . e($f['original_name']) . '" loading="lazy"></a>';
+          if ($canUpload) $h .= '<form method="post" class="inline">' . csrf_field() . '<input type="hidden" name="file_id" value="' . (int)$f['id'] . '"><button class="link" name="action" value="delete_file">Remove</button></form>';
+          return '<figure class="proof">' . $h . '</figure>';
+      };
+      $uploadForm = function (string $kind, ?int $rid, string $label) use ($canUpload): string {
+          if (!$canUpload) return '';
+          $accept = $kind === 'signoff' ? 'image/*,application/pdf' : 'image/*';
+          return '<form method="post" enctype="multipart/form-data" class="upload">' . csrf_field()
+              . '<input type="hidden" name="kind" value="' . $kind . '">' . ($rid ? '<input type="hidden" name="request_id" value="' . $rid . '">' : '')
+              . '<input type="file" name="files[]" accept="' . $accept . '"' . ($kind === 'photo' && !$rid ? ' multiple' : '') . ' required aria-label="' . e($label) . '">'
+              . '<button class="btn plain" name="action" value="upload">Upload</button></form>';
+      };
+    ?>
+    <section id="proof" class="proof-wrap">
+      <h2 style="margin-top:1.8rem">Completion photos</h2>
+      <?php if ($canUpload): ?><p class="hint">Use your phone: tap Choose file, then take a photo or pick one from your library.</p><?php endif; ?>
+      <?php if ($photoReqs): ?>
+        <ul class="photo-requests">
+        <?php foreach ($photoReqs as $r): $got = $byReq[(int)$r['id']] ?? []; ?>
+          <li class="<?= $got ? 'done' : '' ?>">
+            <div class="req-head"><strong><?= e($r['label']) ?></strong>
+              <span class="tag <?= $got ? 'ok' : '' ?>"><?= $got ? 'Uploaded' : 'Needed' ?></span>
+              <?php if ($canEditRequests && !$got): ?><form method="post" class="inline"><?= csrf_field() ?><input type="hidden" name="request_id" value="<?= (int)$r['id'] ?>"><button class="link" name="action" value="remove_photo_request">Remove</button></form><?php endif; ?>
+            </div>
+            <?php if ($got): ?><div class="gallery"><?php foreach ($got as $f) echo $thumb($f); ?></div><?php endif; ?>
+            <?= $uploadForm('photo', (int)$r['id'], 'Photo: ' . $r['label']) ?>
+          </li>
+        <?php endforeach; ?>
+        </ul>
+      <?php endif; ?>
+      <?php if ($canEditRequests): ?>
+        <form method="post" class="inline-add"><?= csrf_field() ?>
+          <label>Ask the tech for a photo <input type="text" name="label" maxlength="200" placeholder="e.g. Serial number label on the new device"></label>
+          <button class="btn plain" name="action" value="add_photo_request">Add</button></form>
+      <?php endif; ?>
+      <h3><?= $photoReqs ? 'Other photos of the finished work' : 'Photos of the finished work' ?></h3>
+      <?php if ($extra): ?><div class="gallery"><?php foreach ($extra as $f) echo $thumb($f); ?></div>
+      <?php elseif (!$canUpload): ?><p class="muted">None yet.</p><?php endif; ?>
+      <?= $uploadForm('photo', null, 'Photos of the finished work') ?>
+      <h3>Signed work order</h3>
+      <?php if ($signoffs): ?><div class="gallery"><?php foreach ($signoffs as $f) echo $thumb($f); ?></div>
+      <?php elseif (!$canUpload): ?><p class="muted">Not uploaded.</p>
+      <?php else: ?><p class="hint">Print the work order, have the site manager sign it, then photograph the page.</p><?php endif; ?>
+      <?= $uploadForm('signoff', null, 'Signed work order') ?>
+    </section>
+    <?php endif; ?>
   </div>
   <dl class="facts-list">
     <dt>Pay to tech</dt><dd><?= money((int)$w['pay_cents']) ?></dd>
@@ -164,11 +289,13 @@ page_start($w['title'], $u);
     <dt>Starts</dt><dd><?= e(fmt_start($w['start_at'])) ?> (local time)</dd>
     <?php if ($w['est_hours']): ?><dt>Estimated</dt><dd><?= (float)$w['est_hours'] ?> hours</dd><?php endif; ?>
     <dt>Location</dt><dd><?= $showAddress ? e($w['street']) . '<br>' : '' ?><?= e($w['city'] . ', ' . $w['state'] . ' ' . ($showAddress ? $w['zip'] : '')) ?>
-      <?= $miles !== null ? '<br><span class="muted">' . round($miles) . ' miles from you</span>' : '' ?></dd>
+      <?= $miles !== null ? '<br><span class="muted">' . round($miles) . ' miles from you</span>' : '' ?>
+      <?php if ($showAddress && $w['status'] !== 'cancelled'): ?><br><a class="btn plain" style="margin-top:.4rem" target="_blank" rel="noopener"
+        href="<?= e(maps_directions_url($w)) ?>">Get directions</a><?php endif; ?></dd>
     <dt>Skills</dt><dd><?= e(skill_labels($w['skills'])) ?></dd>
     <?php if ($w['min_coverage']): ?><dt>Insurance</dt><dd>At least $<?= number_format((int)$w['min_coverage']) ?> per occurrence</dd><?php endif; ?>
     <dt>Provider</dt><dd><?= e($w['company']) ?></dd>
-    <?php if ($tech && ($isOwner || $role === 'admin')): ?><dt>Tech</dt><dd><?= e($tech['full_name']) ?></dd><?php endif; ?>
+    <?php if ($tech && ($isOwner || $role === 'admin')): ?><dt>Tech</dt><dd><?= avatar_html((int)$w['tech_id'], $tech['full_name']) ?><?= e($tech['full_name']) ?></dd><?php endif; ?>
     <?php if ($payOn && ($isOwner || $isAssigned || $role === 'admin') && $w['status'] !== 'open'): ?>
       <dt>Payment</dt><dd><?php
         if (!$payment || $payment['status'] === 'pending') echo 'Not paid yet';
@@ -178,7 +305,10 @@ page_start($w['title'], $u);
         if ($payment && ($isOwner || $role === 'admin') && (int)$payment['tax_cents'] > 0) echo '<br><span class="muted">Includes ' . money((int)$payment['tax_cents']) . ' sales tax</span>';
       ?></dd>
     <?php endif; ?>
-    <?php if ($w['checked_in_at']): ?><dt>Checked in</dt><dd><?= e(substr($w['checked_in_at'], 0, 16)) ?> UTC</dd><?php endif; ?>
+    <?php if ($w['checked_in_at']): ?><dt>Checked in</dt><dd><?= e(substr($w['checked_in_at'], 0, 16)) ?> UTC
+      <?php if ($seeProof): ?><br><span class="muted"><?= e(job_location_text(job_location((int)$w['id'], 'check_in'))) ?></span><?php endif; ?></dd><?php endif; ?>
+    <?php if ($w['submitted_at']): ?><dt>Completed</dt><dd><?= e(substr($w['submitted_at'], 0, 16)) ?> UTC
+      <?php if ($seeProof): ?><br><span class="muted"><?= e(job_location_text(job_location((int)$w['id'], 'submit'))) ?></span><?php endif; ?></dd><?php endif; ?>
   </dl>
 </div>
 
@@ -198,6 +328,7 @@ page_start($w['title'], $u);
     <?php foreach ($requests as $r): $ri = insurance_state((int)$r['tech_id']); ?>
       <div class="review">
         <div>
+          <?= avatar_html((int)$r['tech_id'], $r['full_name']) ?>
           <h3><?= e($r['full_name']) ?></h3>
           <p><?= e($r['headline']) ?></p>
           <p class="muted"><?= e($r['city'] . ', ' . $r['state']) ?>, <?= round(miles_between((float)$r['lat'], (float)$r['lng'], (float)$w['lat'], (float)$w['lng'])) ?> miles from the site.
@@ -224,7 +355,9 @@ page_start($w['title'], $u);
     <?php endif; ?>
   <?php elseif ($w['status'] === 'submitted'): ?>
     <h2>Review the completed work</h2>
-    <p>The tech has marked this job complete. Read the completion notes, then approve it or send it back.</p>
+    <p>The tech has marked this job complete. Check the completion notes, photos and signed work order, then approve it or send it back.
+      <?= $paid ? 'Approving releases the tech\'s payment.' : '' ?></p>
+    <?php if (!array_filter($files, fn($f) => $f['kind'] === 'signoff')): ?><p class="notice">The tech didn't upload a signed work order. Ask for one in the chat, or send the job back, if you need it.</p><?php endif; ?>
     <form method="post" style="display:flex;gap:.6rem;flex-wrap:wrap"><?= csrf_field() ?>
       <button class="btn primary" name="action" value="approve">Approve work</button>
       <button class="btn plain" name="action" value="reopen_work">Send back to the tech</button>
@@ -246,6 +379,7 @@ page_start($w['title'], $u);
   <?php if ($myPending && $myPending['kind'] === 'offer' && $w['status'] === 'open'): ?>
     <h2><?= e($w['company']) ?> has offered you this job</h2>
     <form method="post" style="display:flex;gap:.6rem;flex-wrap:wrap"><?= csrf_field() ?>
+      <p class="hint" style="flex-basis:100%"><?= e(NO_SHOW_POLICY) ?></p>
       <button class="btn primary" name="action" value="accept_offer">Accept job</button>
       <button class="btn plain" name="action" value="decline_offer">Decline</button>
     </form>
@@ -256,6 +390,7 @@ page_start($w['title'], $u);
     <h2>Request this job</h2>
     <form method="post" class="stack" style="max-width:36rem"><?= csrf_field() ?>
       <label>Note to the provider <span class="hint">Optional. Relevant experience, availability.</span><textarea name="note" rows="3" maxlength="500"></textarea></label>
+      <p class="hint"><?= e(NO_SHOW_POLICY) ?></p>
       <div><button class="btn primary" name="action" value="request">Request job</button></div>
     </form>
   <?php elseif ($isAssigned && $w['status'] === 'assigned' && $payOn && !$paid): ?>
@@ -264,13 +399,22 @@ page_start($w['title'], $u);
     <?php if (!tech_can_be_paid($uid)): ?><p><a href="/portal/payouts.php">Set up payouts</a> so you can be paid when the work is approved.</p><?php endif; ?>
   <?php elseif ($isAssigned && $w['status'] === 'assigned'): ?>
     <h2>You're booked</h2>
-    <p><?= $payOn ? 'Payment is secured. ' : '' ?>Check in when you arrive on site.</p>
-    <form method="post"><?= csrf_field() ?><button class="btn primary" name="action" value="check_in">Check in</button></form>
+    <p><?= $payOn ? 'Payment is secured. ' : '' ?>Check in when you arrive on site. <?= e(NO_SHOW_POLICY) ?></p>
+    <form method="post" data-gps class="stack" style="max-width:40rem"><?= csrf_field() ?>
+      <label class="check"><input type="checkbox" name="share_gps" value="1" checked> <span>Share my location with the provider to confirm I'm on site</span></label>
+      <input type="hidden" name="gps_lat"><input type="hidden" name="gps_lng"><input type="hidden" name="gps_acc">
+      <p class="hint gps-status" aria-live="polite"></p>
+      <div><button class="btn primary" name="action" value="check_in">Check in</button></div></form>
   <?php elseif ($isAssigned && $w['status'] === 'in_progress'): ?>
     <h2>Mark the job complete</h2>
-    <form method="post" class="stack" style="max-width:40rem"><?= csrf_field() ?>
+    <form method="post" data-gps class="stack" style="max-width:40rem"><?= csrf_field() ?>
+      <?php $miss = missing_photo_requests((int)$w['id']); $havePhoto = (bool)array_filter($files, fn($f) => $f['kind'] === 'photo'); ?>
+      <?php if ($miss || !$havePhoto): ?><p class="notice">Before you submit: <?= $miss ? 'upload the ' . count($miss) . ' requested photo' . (count($miss) > 1 ? 's' : '') . ' marked Needed above.' : 'upload at least one photo of the finished work above.' ?></p><?php endif; ?>
       <label>Completion notes <span class="hint">What you did, anything left outstanding, who signed off on site.</span>
         <textarea name="notes" rows="5" required></textarea></label>
+      <label class="check"><input type="checkbox" name="share_gps" value="1" checked> <span>Share my location with the provider to confirm I'm on site</span></label>
+      <input type="hidden" name="gps_lat"><input type="hidden" name="gps_lng"><input type="hidden" name="gps_acc">
+      <p class="hint gps-status" aria-live="polite"></p>
       <div><button class="btn primary" name="action" value="submit">Submit for approval</button></div>
     </form>
   <?php elseif ($isAssigned && $w['status'] === 'submitted'): ?>
@@ -318,4 +462,5 @@ page_start($w['title'], $u);
 </section>
 <script src="/assets/chat.js" defer></script>
 <?php endif; ?>
+<script src="/assets/gps.js" defer></script>
 <?php page_end();

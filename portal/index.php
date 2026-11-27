@@ -19,6 +19,20 @@ page_start('Dashboard', $u);
 ?>
   <p>Finish these to start getting work orders.</p>
   <ol class="checklist">
+    <?php $photoUrl = tech_photo_url((int)$u['id']); ?>
+    <li class="<?= $photoUrl ? 'done' : '' ?>">
+      <div style="display:flex;gap:1rem;align-items:center"><?php if ($photoUrl): ?><img class="avatar" src="<?= e($photoUrl) ?>" alt="Your photo"><?php endif; ?>
+        <div><h3>Your photo</h3><p><?= $photoUrl ? 'Providers see this and it prints on your work orders.' : 'Take a clear selfie. Providers see it, and site managers use it to check who has arrived.' ?></p></div></div>
+      <a class="btn <?= $photoUrl ? 'plain' : 'primary' ?>" href="/portal/photo.php"><?= $photoUrl ? 'Change photo' : 'Add your photo' ?></a>
+    </li>
+    <?php $idc = latest_id_check((int)$u['id']); $idOk = identity_verified((int)$u['id']); ?>
+    <li class="<?= $idOk ? 'done' : '' ?>">
+      <div><h3>Identity check</h3><p><?= $idOk ? 'Verified.'
+          : ($idc && $idc['status'] === 'pending' ? 'License uploaded, waiting for review.'
+          : ($idc && $idc['status'] === 'rejected' ? 'Not approved' . ($idc['note'] ? ': ' . e($idc['note']) : '') . '. Upload it again.'
+          : 'Upload a photo of your driver\'s license. Only the admin sees it, and it\'s deleted once you\'re verified.')) ?></p></div>
+      <?php if (!$idOk): ?><a class="btn <?= $idc && $idc['status'] === 'pending' ? 'plain' : 'primary' ?>" href="/portal/identity.php"><?= $idc && $idc['status'] === 'pending' ? 'View' : 'Upload license' ?></a><?php endif; ?>
+    </li>
     <li class="<?= $profileDone ? 'done' : '' ?>">
       <div><h3>Your profile</h3>
         <p><?= $profileDone ? e('Skills, certifications and base location set. Travel radius ' . $p['radius_miles'] . ' miles from ' . $p['city'] . ', ' . $p['state'] . '.') : 'Add your skills, certifications, base address and how far you\'ll travel.' ?></p></div>
@@ -36,7 +50,7 @@ page_start('Dashboard', $u);
     </li>
   </ol>
   <?php if (!$ins['insured'] || $ins['expiring_soon']) echo insurance_offer_html('dashboard'); ?>
-  <?php if ($profileDone && $ins['insured']): ?>
+  <?php if ($profileDone && $ins['insured'] && $photoUrl && $idOk): ?>
     <p><a class="btn primary" href="/portal/jobs/browse.php">Find work near you</a> <a class="btn plain" href="/portal/jobs/">Your jobs and offers</a></p>
   <?php endif; ?>
 <?php else:
